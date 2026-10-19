@@ -1,0 +1,80 @@
+### 00 device query
+Device                      : NVIDIA GB10 (cc 12.1)
+Driver / runtime            : 13000 / 13000
+SMs                         : 48
+Max threads / SM            : 1536
+Max blocks / SM             : 24
+Registers / SM              : 65536
+Shared mem / SM             : 100 KB
+L2 cache                    : 24576 KB
+Global memory               : 130.7 GB
+SM clock (max)              : 2418 MHz
+Integrated (shares host mem): 1
+concurrentKernels           : 1
+asyncEngineCount (copy eng.): 1
+Stream priority range       : least=0 greatest=-5
+unifiedAddressing           : 1
+managedMemory               : 1
+concurrentManagedAccess     : 1
+pageableMemoryAccess        : 1
+pageableMemAccessUsesHostPT : 1
+hostNativeAtomicSupported   : 1
+CUDA_DEVICE_MAX_CONNECTIONS : (unset, default 8)
+
+spin_kernel residency (blocks/SM) by block size:
+    32 threads -> 24 blocks/SM
+   256 threads -> 6 blocks/SM
+   512 threads -> 3 blocks/SM
+  1024 threads -> 1 blocks/SM
+
+### 01 concurrency
+K=8 kernels, 1024 threads/block, 1 ms spin. SMs=48, resident blocks/SM=1 -> capacity=48 blocks
+
+  blocks  %capacity |  1-stream us  concurrency     peak |  K-stream us  concurrency     peak
+       1       2.1% |         8014         1.00        1 |         1023         7.82        8
+       2       4.2% |         8021         1.00        1 |         1014         7.89        8
+       6      12.5% |         8015         1.00        1 |         1015         7.88        8
+      12      25.0% |         8014         1.00        1 |         2007         3.99        4
+      24      50.0% |         8016         1.00        1 |         4004         2.00        2
+      48     100.0% |         8016         1.00        1 |         8002         1.00        1
+      96     200.0% |        16016         1.00        1 |        16003         1.00        2
+
+### 02 false dependencies
+connections=1           streams=32  chain=4 depth-first   wall=  97283 us (ideal 4000)  concurrency= 1.32  peak=2
+connections=1           streams=32  chain=4 breadth-first wall=   4072 us (ideal 4000)  concurrency=31.43  peak=32
+connections=2           streams=32  chain=4 depth-first   wall=  49150 us (ideal 4000)  concurrency= 2.60  peak=4
+connections=2           streams=32  chain=4 breadth-first wall=   4073 us (ideal 4000)  concurrency=31.43  peak=32
+connections=4           streams=32  chain=4 depth-first   wall=  25121 us (ideal 4000)  concurrency= 5.10  peak=8
+connections=4           streams=32  chain=4 breadth-first wall=   4077 us (ideal 4000)  concurrency=31.39  peak=32
+connections=8           streams=32  chain=4 depth-first   wall=  13109 us (ideal 4000)  concurrency= 9.76  peak=16
+connections=8           streams=32  chain=4 breadth-first wall=   4075 us (ideal 4000)  concurrency=31.41  peak=32
+connections=16          streams=32  chain=4 depth-first   wall=   7160 us (ideal 4000)  concurrency=17.88  peak=32
+connections=16          streams=32  chain=4 breadth-first wall=   4078 us (ideal 4000)  concurrency=31.39  peak=32
+connections=32          streams=32  chain=4 depth-first   wall=   4292 us (ideal 4000)  concurrency=29.82  peak=32
+connections=32          streams=32  chain=4 breadth-first wall=   4070 us (ideal 4000)  concurrency=31.45  peak=32
+connections=32          streams=64  chain=4 depth-first   wall=   7315 us (ideal 4000)  concurrency=35.00  peak=64
+connections=32          streams=64  chain=4 breadth-first wall=   4148 us (ideal 4000)  concurrency=61.72  peak=64
+
+### 03 default stream
+blocking streams, no default-stream work       wall=  1007 us (ideal 1000)  concurrency=3.97  peak=4
+blocking streams + legacy default stream       wall=  4049 us (ideal 1000)  concurrency=0.99  peak=1
+non-blocking streams + legacy default stream   wall=  1013 us (ideal 1000)  concurrency=3.95  peak=4
+blocking streams + per-thread default stream   wall=  1015 us (ideal 1000)  concurrency=3.94  peak=4
+
+### 04 copy overlap
+256 MB copies, compute kernel = 288 blocks x 256 threads
+
+case                                 copy us      GB/s kernel us   both us  overlap
+H2D pinned,   kernel launched 1st       4395      61.1      4400      4578     0.96
+H2D pageable, kernel launched 1st       4379      61.3      4385      4412     0.99
+H2D pageable, copy launched 1st         4410      60.9      4416      8826    -0.00
+D2H pinned,   kernel launched 1st       4429      60.6      4435      4457     0.99
+D2H pageable, kernel launched 1st       4414      60.8      4420      4420     1.00
+
+H2D || D2H (pinned): h2d=4398 us  d2h=4630 us  both=8880 us  overlap=0.03
+
+### 05 priorities
+big kernel: 5760 blocks (20 waves x 288) x 200 us, small kernel: 1 block x 50 us, launched ~500 us later
+
+small on equal (low) priority  small starts    4006 us after big starts; small finishes     -40 us before big ends (median of 5)
+small on HIGH priority         small starts     601 us after big starts; small finishes    3412 us before big ends (median of 5)

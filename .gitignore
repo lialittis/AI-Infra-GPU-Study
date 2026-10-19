@@ -1,0 +1,7 @@
+build/
+*.nsys-rep
+*.ncu-rep
+*.sqlite
+__pycache__/
+.venv/
+.remote.env
