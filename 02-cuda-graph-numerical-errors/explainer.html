@@ -1,0 +1,1217 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CUDA Graph Replay Pitfalls</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+/* Layout: a long-form lab write-up. A sticky table of contents sits beside a wide main column on desktop and moves to
+   the top on phones. Each example is one block: what breaks, the buggy and fixed code side by side, the measured
+   iteration strip, then "Underneath". Phase colors (warmup / capture / replay) are the page's visual language. */
+:root {
+  --paper: #f2f5f7;
+  --surface: #ffffff;
+  --ink: #15202a;
+  --ink-2: #4b5966;
+  --rule: #d4dde4;
+  --code-bg: #e9eef2;
+  --accent: #2457a6;          /* replay blue doubles as the link / accent hue */
+  --eager: #7a8792;
+  --capture: #c4610c;
+  --replay: #2457a6;
+  --bad: #b02a5b;
+  --bad-bg: #f8e4ec;
+  --good: #1d7a4b;
+  --good-bg: #e0f1e7;
+  --warn-bg: #fbefdc;
+  --tk-kw: #8a2f8f;
+  --tk-str: #1d7a4b;
+  --tk-num: #b2560a;
+  --tk-com: #6b7883;
+  --tk-fn: #2457a6;
+  --font-display: "Bricolage Grotesque", "Avenir Next Condensed", "Arial Narrow", sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --step--1: 0.8125rem;
+  --step-0: 1rem;
+  --step-1: 1.1875rem;
+  --step-2: 1.5rem;
+  --step-3: 2.125rem;
+  --step-4: clamp(2.25rem, 1.6rem + 2.6vw, 3.5rem);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1418; --surface: #151d24; --ink: #e2e9ee; --ink-2: #9aa9b5; --rule: #29343e; --code-bg: #1a242d;
+    --accent: #7aa4e8; --eager: #8d9aa5; --capture: #ec9346; --replay: #7aa4e8; --bad: #ec7aa2; --bad-bg: #3a1828;
+    --good: #5cc28f; --good-bg: #12301f; --warn-bg: #352713; --tk-kw: #d39be0; --tk-str: #7fd1a3; --tk-num: #f0a868;
+    --tk-com: #7d8b97; --tk-fn: #8fb4ee; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e1418; --surface: #151d24; --ink: #e2e9ee; --ink-2: #9aa9b5; --rule: #29343e; --code-bg: #1a242d;
+  --accent: #7aa4e8; --eager: #8d9aa5; --capture: #ec9346; --replay: #7aa4e8; --bad: #ec7aa2; --bad-bg: #3a1828;
+  --good: #5cc28f; --good-bg: #12301f; --warn-bg: #352713; --tk-kw: #d39be0; --tk-str: #7fd1a3; --tk-num: #f0a868;
+  --tk-com: #7d8b97; --tk-fn: #8fb4ee; color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--paper); color: var(--ink); font-family: var(--font-body); font-size: var(--step-0);
+  line-height: 1.6; -webkit-font-smoothing: antialiased;
+}
+a { color: var(--accent); text-underline-offset: 2px; }
+a:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+code, pre, .mono { font-family: var(--font-mono); }
+:not(pre) > code { font-size: 0.88em; background: var(--code-bg); padding: 0.08em 0.35em; border-radius: 3px; }
+h1, h2, h3 { font-family: var(--font-display); line-height: 1.12; text-wrap: balance; margin: 0; }
+p { margin: 0; }
+
+.wrap {
+  max-width: 1240px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 48px; padding-block: 8px 96px; }
+@media (max-width: 960px) { .layout { grid-template-columns: minmax(0, 1fr); gap: 24px; } }
+
+/* ---------- table of contents */
+.toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 24px); align-self: start; font-size: var(--step--1); }
+.toc h2 { font-family: var(--font-body); font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-2); font-weight: 600; margin-bottom: 10px; }
+.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.toc a { display: block; text-decoration: none; color: var(--ink-2); padding: 3px 0 3px 10px; border-left: 2px solid var(--rule); }
+.toc a:hover { color: var(--ink); border-left-color: var(--ink-2); }
+.toc .sub a { padding-left: 22px; font-size: 0.78rem; }
+@media (max-width: 960px) {
+  .toc { position: static; background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 14px 16px; }
+  .toc ol { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+  .toc .sub { display: none; }
+}
+
+main { min-width: 0; display: grid; gap: 72px; }
+section { display: grid; gap: 28px; min-width: 0; }
+.prose { max-width: 68ch; display: grid; gap: 14px; }
+.eyebrow { font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-2); font-weight: 600; }
+
+/* ---------- hero */
+header.hero { padding-block: 56px 32px; display: grid; gap: 18px; }
+.hero h1 { font-size: var(--step-4); font-weight: 700; letter-spacing: -0.02em; max-width: 18ch; }
+.hero .lede { font-size: var(--step-1); color: var(--ink-2); max-width: 62ch; }
+.hero .lede strong { color: var(--ink); font-weight: 600; }
+.runline { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: var(--step--1); color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.runline span { display: inline-flex; gap: 6px; align-items: baseline; }
+.runline b { color: var(--ink); font-weight: 600; }
+
+/* ---------- anatomy diagram */
+.anatomy { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 24px; display: grid; gap: 24px; }
+.anatomy-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+@media (max-width: 760px) { .anatomy-grid { grid-template-columns: minmax(0, 1fr); } }
+.anatomy h3 { font-family: var(--font-body); font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-2); font-weight: 600; margin-bottom: 10px; }
+.trace { margin: 0; font-size: 0.82rem; line-height: 1.75; overflow-x: auto; background: var(--code-bg); border-radius: 6px; padding: 12px 0; }
+.trace div { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; padding: 0 14px; white-space: pre; }
+.trace .note { font-family: var(--font-body); font-size: 0.74rem; white-space: nowrap; align-self: center; }
+.trace .cpu { color: var(--ink-2); }
+.trace .cpu .note { color: var(--capture); }
+.trace .node .note { color: var(--replay); font-weight: 600; }
+.trace .dim { opacity: 0.45; }
+.nodes { display: grid; gap: 10px; }
+.node-card { border: 1px solid var(--rule); border-left: 3px solid var(--replay); border-radius: 4px; padding: 10px 12px; font-size: 0.8rem; display: grid; gap: 2px; background: var(--paper); }
+.node-card .k { font-family: var(--font-mono); font-weight: 500; }
+.node-card dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 12px; margin: 4px 0 0; }
+.node-card dt { color: var(--ink-2); }
+.node-card dd { margin: 0; font-family: var(--font-mono); overflow-wrap: anywhere; }
+.nodes .fine { font-size: 0.74rem; color: var(--ink-2); }
+.rules { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; }
+.rules > div { display: grid; gap: 6px; align-content: start; min-width: 0; }
+.rules h4 { margin: 0; font-size: var(--step--1); font-weight: 600; }
+.rules ul { margin: 0; padding-left: 18px; font-size: 0.9rem; display: grid; gap: 4px; }
+.rules .yes h4 { color: var(--replay); }
+.rules .no h4 { color: var(--capture); }
+
+/* ---------- mechanisms overview */
+.mechs { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.mech { display: grid; gap: 8px; align-content: start; padding: 16px; background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; text-decoration: none; color: inherit; }
+.mech:hover { border-color: var(--ink-2); }
+.mech .tag { font-family: var(--font-mono); font-size: 0.75rem; color: var(--ink-2); }
+.mech h3 { font-size: var(--step-1); }
+.mech p { font-size: 0.9rem; color: var(--ink-2); }
+
+/* ---------- legend */
+.legend { display: flex; flex-wrap: wrap; gap: 10px 22px; font-size: var(--step--1); color: var(--ink-2); align-items: center; }
+.legend span { display: inline-flex; align-items: center; gap: 7px; }
+.sw { width: 22px; height: 6px; border-radius: 3px; display: inline-block; }
+.sw.e { background: var(--eager); } .sw.c { background: var(--capture); } .sw.r { background: var(--replay); }
+.sw.bad { height: 14px; width: 14px; background: var(--bad-bg); border: 1.5px solid var(--bad); border-radius: 3px; }
+
+/* ---------- section headers */
+.sec-head { display: grid; gap: 10px; border-top: 2px solid var(--ink); padding-top: 18px; }
+.sec-head h2 { font-size: var(--step-3); font-weight: 700; letter-spacing: -0.01em; }
+.sec-head .prose { color: var(--ink-2); }
+
+/* ---------- example blocks */
+article.ex { display: grid; gap: 18px; min-width: 0; }
+article.ex + article.ex { border-top: 1px solid var(--rule); padding-top: 36px; }
+.ex h3 { font-size: var(--step-2); font-weight: 600; letter-spacing: -0.005em; }
+.ex .what { font-size: var(--step-1); color: var(--ink-2); max-width: 64ch; line-height: 1.5; }
+.cases { font-family: var(--font-mono); font-size: 0.74rem; color: var(--ink-2); }
+
+.pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 14px; }
+figure.code { margin: 0; min-width: 0; display: grid; grid-template-rows: auto 1fr; border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; background: var(--code-bg); }
+figure.code figcaption { display: flex; justify-content: space-between; gap: 10px; font-size: 0.74rem; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 600; padding: 7px 12px; background: var(--surface); border-bottom: 1px solid var(--rule); }
+figure.code.bug figcaption { color: var(--bad); }
+figure.code.fix figcaption { color: var(--good); }
+figure.code figcaption small { text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--ink-2); }
+figure.code pre { margin: 0; padding: 12px 0; overflow-x: auto; font-size: 0.8rem; line-height: 1.6; }
+figure.code code { display: block; min-width: max-content; }
+.ln { display: block; padding: 0 14px; }
+.ln-bad { background: var(--bad-bg); box-shadow: inset 3px 0 0 var(--bad); }
+.ln-good { background: var(--good-bg); box-shadow: inset 3px 0 0 var(--good); }
+.hljs-keyword, .hljs-built_in.hljs-keyword { color: var(--tk-kw); }
+.hljs-string { color: var(--tk-str); }
+.hljs-number, .hljs-literal { color: var(--tk-num); }
+.hljs-comment { color: var(--tk-com); font-style: italic; }
+.hljs-title, .hljs-title.function_, .hljs-built_in { color: var(--tk-fn); }
+.hljs-meta { color: var(--tk-com); }
+
+/* ---------- iteration strip */
+.measure { display: grid; gap: 8px; min-width: 0; }
+.measure .cap { font-size: var(--step--1); color: var(--ink-2); }
+.measure .cap b { color: var(--ink); font-weight: 600; }
+.strip-scroll { overflow-x: auto; padding-bottom: 4px; }
+.strip { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(74px, 1fr); gap: 6px; min-width: min-content; font-variant-numeric: tabular-nums; }
+.cell { display: grid; gap: 3px; background: var(--surface); border: 1px solid var(--rule); border-radius: 5px; padding: 0 0 8px; overflow: hidden; text-align: center; }
+.cell .bar { height: 5px; background: var(--rule); }
+.cell.ph-e .bar { background: var(--eager); } .cell.ph-c .bar { background: var(--capture); } .cell.ph-r .bar { background: var(--replay); }
+.cell .lab { font-size: 0.68rem; color: var(--ink-2); padding-top: 4px; letter-spacing: 0.02em; }
+.cell .lab em { font-style: normal; display: block; font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.08em; }
+.cell.ph-e .lab em { color: var(--eager); } .cell.ph-c .lab em { color: var(--capture); } .cell.ph-r .lab em { color: var(--replay); }
+.cell .obs { font-family: var(--font-mono); font-size: 1.05rem; font-weight: 500; }
+.cell .exp { font-family: var(--font-mono); font-size: 0.7rem; color: var(--ink-2); }
+.cell.wrong { background: var(--bad-bg); border-color: var(--bad); }
+.cell.wrong .obs { color: var(--bad); }
+
+/* ---------- underneath */
+.under { display: grid; gap: 10px; padding: 16px 18px; background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; max-width: 88ch; }
+.under > .eyebrow { color: var(--replay); }
+.under p, .under li { font-size: 0.95rem; }
+.under ul, .under ol { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+.note-214 { display: grid; gap: 6px; padding: 14px 18px; background: var(--warn-bg); border-radius: 6px; max-width: 88ch; font-size: 0.95rem; }
+.note-214 > .eyebrow { color: var(--capture); }
+
+/* ---------- diagrams */
+.diagram { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 16px 18px; display: grid; gap: 12px; min-width: 0; }
+.diagram > .eyebrow { color: var(--ink-2); }
+.mem { display: grid; gap: 8px; overflow-x: auto; }
+.mem-row { display: grid; grid-template-columns: 116px minmax(0, 1fr); gap: 12px; align-items: center; font-size: 0.82rem; min-width: 420px; }
+.mem-row .addr { font-family: var(--font-mono); font-size: 0.76rem; color: var(--ink-2); text-align: right; }
+.mem-row .blk { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { display: inline-flex; gap: 6px; align-items: baseline; padding: 3px 9px; border-radius: 4px; border: 1px solid var(--rule); background: var(--paper); font-size: 0.8rem; white-space: nowrap; }
+.chip .mono { font-size: 0.76rem; }
+.chip.g1 { border-color: var(--capture); }
+.chip.g2 { border-color: var(--replay); }
+.chip.hot { background: var(--bad-bg); border-color: var(--bad); }
+.chip.ok { background: var(--good-bg); border-color: var(--good); }
+.chip.stale { opacity: 0.6; text-decoration: line-through; }
+.steps { margin: 0; padding-left: 20px; display: grid; gap: 4px; font-size: 0.9rem; }
+
+.order { display: grid; gap: 10px; overflow-x: auto; }
+.order-row { display: grid; grid-template-columns: 210px minmax(0, 1fr) 82px; gap: 12px; align-items: center; min-width: 600px; font-size: 0.85rem; }
+.order-row .seq { display: flex; gap: 5px; flex-wrap: nowrap; }
+.op { font-family: var(--font-mono); font-size: 0.76rem; padding: 3px 7px; border-radius: 3px; border: 1px solid var(--rule); background: var(--paper); }
+.op.f { border-color: var(--replay); }
+.op.b { border-color: var(--capture); }
+.op.off { background: var(--bad-bg); border-color: var(--bad); }
+.order-row .res { font-family: var(--font-mono); font-size: 0.76rem; text-align: right; }
+.order-row .res.bad { color: var(--bad); } .order-row .res.ok { color: var(--good); }
+
+/* timeline (to scale: 0 to 200 ms) */
+.tl { display: grid; gap: 10px; overflow-x: auto; }
+.tl-inner { min-width: 560px; display: grid; gap: 8px; }
+.lane { display: grid; grid-template-columns: 58px minmax(0, 1fr); gap: 10px; align-items: center; font-size: 0.78rem; }
+.lane .name { color: var(--ink-2); text-align: right; font-weight: 600; }
+.track { position: relative; height: 34px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; }
+.seg { position: absolute; top: 4px; bottom: 4px; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: 0.68rem; overflow: hidden; white-space: nowrap; }
+.seg.sleep { background: var(--code-bg); color: var(--ink-2); border: 1px dashed var(--eager); }
+.seg.copy { background: var(--bad); width: 3px !important; }
+.tick { position: absolute; top: 4px; bottom: 4px; width: 2px; background: var(--capture); }
+.axis { display: grid; grid-template-columns: 58px minmax(0, 1fr); gap: 10px; font-size: 0.7rem; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.axis .scale { display: flex; justify-content: space-between; }
+.tl-key { font-size: 0.8rem; color: var(--ink-2); display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.tl-key i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; vertical-align: -1px; margin-right: 5px; }
+
+/* ---------- tables */
+.tbl-scroll { overflow-x: auto; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 0.86rem; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 7px 12px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); font-weight: 600; background: var(--paper); }
+tr:last-child td { border-bottom: 0; }
+td.mono, td .mono { font-family: var(--font-mono); font-size: 0.78rem; }
+.pill { display: inline-block; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.04em; padding: 1px 7px; border-radius: 999px; white-space: nowrap; }
+.pill.REPRODUCED, .pill.CORRECT { background: var(--good-bg); color: var(--good); }
+.pill.ERROR, .pill.NOT, .pill.WRONG { background: var(--warn-bg); color: var(--capture); }
+.pill.kind { background: var(--code-bg); color: var(--ink-2); font-weight: 500; }
+
+.diffs { display: grid; gap: 12px; counter-reset: d; }
+.diff { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 12px; padding: 14px 16px; background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; }
+.diff::before { counter-increment: d; content: counter(d); font-family: var(--font-display); font-weight: 700; font-size: 1.4rem; color: var(--capture); line-height: 1.1; }
+.diff h3 { font-family: var(--font-body); font-size: 1rem; font-weight: 600; margin-bottom: 4px; }
+.diff p { font-size: 0.93rem; color: var(--ink-2); }
+
+details.all { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; }
+details.all summary { cursor: pointer; padding: 12px 16px; font-weight: 600; }
+details.all .tbl-scroll { border: 0; border-top: 1px solid var(--rule); border-radius: 0; }
+
+.checklist { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.checklist div { padding: 14px 16px; background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; display: grid; gap: 6px; align-content: start; }
+.checklist h3 { font-family: var(--font-body); font-size: 0.95rem; font-weight: 600; }
+.checklist p { font-size: 0.9rem; color: var(--ink-2); }
+
+footer { border-top: 1px solid var(--rule); padding-block: 22px 40px; font-size: var(--step--1); color: var(--ink-2); }
+
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="hero">
+  <div class="eyebrow">GPU-Study · topic 02 · reproduced on a DGX Spark</div>
+  <h1>CUDA graph replay pitfalls</h1>
+  <p class="lede">A CUDA graph is a <strong>recording</strong>. Replaying it re-issues the GPU work captured once, with
+    <strong>the same kernel arguments, the same launch shapes and the same memory addresses</strong>, and nothing else.
+    Every example on NVIDIA's numerical-errors troubleshooting page follows from that rule. Below, each one is shown buggy
+    and fixed, with the values it actually produced and what happens underneath.</p>
+  <div class="runline">
+    <span>Source <a href="https://docs.nvidia.com/dl-cuda-graph/troubleshooting/numerical-errors.html">NVIDIA: Numerical Errors</a></span>
+    <span>Hardware <b>NVIDIA GB10</b></span>
+    <span>Software <b>torch 2.14.1+cu130 · CUDA 13.0</b></span>
+    <span>Run <b>2026-10-19</b></span>
+    <span><b>66</b> cases · <b>59</b> as the page says · <b>7</b> differ</span>
+  </div>
+</header>
+
+<div class="layout">
+<nav class="toc" aria-label="Contents">
+  <h2>Contents</h2>
+  <ol>
+    <li><a href="#recording">What a graph records</a></li>
+    <li><a href="#cpu">Decisions made on the CPU</a></li>
+    <li class="sub"><a href="#control-flow">Control flow</a></li>
+    <li class="sub"><a href="#capture-aware">Capture-aware code</a></li>
+    <li class="sub"><a href="#scalars">Python scalars</a></li>
+    <li class="sub"><a href="#hidden">LR, GradScaler, RNG</a></li>
+    <li class="sub"><a href="#shapes">Shapes</a></li>
+    <li class="sub"><a href="#host-state">Host-side state</a></li>
+    <li><a href="#addresses">Addresses</a></li>
+    <li class="sub"><a href="#reassigned">Reassigned inputs</a></li>
+    <li class="sub"><a href="#autocast">Autocast cache</a></li>
+    <li class="sub"><a href="#freed">Freed inputs</a></li>
+    <li class="sub"><a href="#outputs">Output reuse</a></li>
+    <li class="sub"><a href="#shared-pool">Shared pool</a></li>
+    <li class="sub"><a href="#replay-order">Replay order</a></li>
+    <li><a href="#recorded">Which work was recorded</a></li>
+    <li class="sub"><a href="#library">Library streams</a></li>
+    <li class="sub"><a href="#hooks">Module hooks</a></li>
+    <li><a href="#timing">Replay is asynchronous</a></li>
+    <li class="sub"><a href="#pinned">Pinned-memory race</a></li>
+    <li class="sub"><a href="#parallel">Parallel replay</a></li>
+    <li><a href="#debugging">Finding the first bad layer</a></li>
+    <li><a href="#differences">Where torch 2.14 differs</a></li>
+    <li><a href="#checklist">Before you capture</a></li>
+    <li><a href="#all-cases">All 66 cases</a></li>
+  </ol>
+</nav>
+
+<main>
+
+<!-- ================================================================ RECORDING -->
+<section id="recording">
+  <div class="sec-head">
+    <div class="eyebrow">The one rule</div>
+    <h2>What a graph records</h2>
+    <div class="prose"><p>Inside <code>with torch.cuda.graph(g):</code> PyTorch puts a side stream into capture mode.
+      Your Python runs normally, but every kernel launch, memcpy and memset sent to that stream is <em>not executed</em>.
+      It is appended to the graph as a node instead. A kernel node stores the function, its launch shape and a copy of its
+      argument bytes. Tensors allocated during capture come from a memory pool owned by the graph, so their addresses
+      stay valid between replays. <code>g.replay()</code> then enqueues the whole node list with one call.</p></div>
+  </div>
+
+  <div class="anatomy" aria-label="Capture of the page's control-flow example">
+    <div class="anatomy-grid">
+      <div>
+        <h3>Your Python during capture (idx = 3)</h3>
+        <div class="trace mono" role="figure" aria-label="Python lines during capture"><div class="cpu"><span>def func(idx, x, y):</span><span class="note"></span></div><div class="cpu"><span>    if idx % 2 == 0:</span><span class="note">CPU decides once: odd</span></div><div class="dim"><span>        z = x + y</span><span class="note">never launched</span></div><div class="cpu"><span>    else:</span><span class="note"></span></div><div class="node"><span>        z = x - y</span><span class="note">→ node 1</span></div><div class="node"><span>    return z * x</span><span class="note">→ node 2</span></div></div>
+      </div>
+      <div>
+        <h3>What the graph keeps</h3>
+        <div class="nodes">
+          <div class="node-card"><span class="k">node 1 · elementwise sub</span>
+            <dl><dt>reads</dt><dd>&amp;x, &amp;y</dd><dt>writes</dt><dd>&amp;z (graph pool)</dd><dt>shape</dt><dd>1 element, grid fixed</dd></dl></div>
+          <div class="node-card"><span class="k">node 2 · elementwise mul</span>
+            <dl><dt>reads</dt><dd>&amp;z, &amp;x</dd><dt>writes</dt><dd>&amp;out (graph pool)</dd><dt>shape</dt><dd>1 element, grid fixed</dd></dl></div>
+          <p class="fine">Simplified. <code>idx</code> appears nowhere: it was only ever a CPU value.</p>
+        </div>
+      </div>
+    </div>
+    <div class="rules">
+      <div class="yes"><h4>Replay re-issues</h4><ul>
+        <li>every captured kernel, with its saved argument bytes (pointers and scalars)</li>
+        <li>captured memcpy and memset nodes, with their saved addresses</li>
+        <li>the same launch shapes</li></ul></div>
+      <div class="no"><h4>Replay never re-runs</h4><ul>
+        <li>Python: branches, loops, counters, prints, hooks</li>
+        <li>allocations and frees</li>
+        <li>host syncs such as <code>.item()</code> (illegal inside capture)</li>
+        <li>work sent to any stream that is not part of the capture</li></ul></div>
+      <div><h4>And capture itself computes nothing</h4><ul>
+        <li>Values produced inside the <code>with</code> block exist only after the first replay. That is why every example
+          below replays once right after capturing.</li></ul></div>
+    </div>
+  </div>
+
+  <div class="prose"><p>Every failure on the page is one of four things that the recording freezes or leaves out:</p></div>
+  <div class="mechs">
+    <a class="mech" href="#cpu"><span class="tag">frozen choice</span><h3>Decisions made on the CPU</h3><p>Branches, Python scalars, shapes and Python side effects only happen at capture.</p></a>
+    <a class="mech" href="#addresses"><span class="tag">frozen pointers</span><h3>Addresses</h3><p>The graph reads and writes fixed pointers, whatever lives there now.</p></a>
+    <a class="mech" href="#recorded"><span class="tag">missing nodes</span><h3>Which work was recorded</h3><p>Only the capture stream is recorded. Other work ran once, then disappears.</p></a>
+    <a class="mech" href="#timing"><span class="tag">async replay</span><h3>Replay is asynchronous</h3><p>Replay only enqueues. The CPU and other streams race the queued work.</p></a>
+  </div>
+
+  <div class="diagram">
+    <div class="eyebrow">How to read the measured strips below</div>
+    <div class="legend">
+      <span><i class="sw e"></i>warmup (eager)</span>
+      <span><i class="sw c"></i>capture, then one replay</span>
+      <span><i class="sw r"></i>replay only</span>
+      <span><i class="sw bad"></i>observed value differs from correct</span>
+    </div>
+    <p style="font-size:0.9rem;color:var(--ink-2)">Each cell shows the observed value large and the correct (eager) value as <span class="mono">exp</span> beneath it.
+      All values come from the repo's run log <span class="mono">02-cuda-graph-numerical-errors/results/20261019-145927.txt</span>.</p>
+  </div>
+</section>
+
+<!-- ================================================================ CPU DECISIONS -->
+<section id="cpu">
+  <div class="sec-head">
+    <div class="eyebrow">Frozen choice</div>
+    <h2>Decisions made on the CPU</h2>
+    <div class="prose"><p>Anything Python decides while capturing becomes a constant of the graph: which branch, which scalar,
+      how many elements, what the host-side state was. The fix is always one of two moves. Either turn the decision into
+      data the GPU reads at replay time, or keep it outside the graph.</p></div>
+  </div>
+
+  <article class="ex" id="control-flow">
+    <h3>Dynamic control flow</h3>
+    <p class="what">A Python <code>if</code> on a runtime value picks one branch at capture. Every replay repeats that branch.</p>
+    <div class="pair">
+      <figure class="code bug"><figcaption>Bug <small>page code</small></figcaption><pre><code class="language-python">def func(idx, x, y):
+    if idx % 2 == 0:  # ❌ Dynamic control flow!
+        z = x + y
+    else:
+        z = x - y
+    return z * x
+
+for i in range(6):
+    if i &lt; 3:      z = func(i, x, y)      # warmup
+    elif i == 3:              # capture: idx=3 is odd
+        with torch.cuda.graph(graph):
+            z = func(i, x, y)
+        graph.replay()
+    else:          graph.replay()</code></pre></figure>
+      <figure class="code fix"><figcaption>Fix <small>torch.where, from the page</small></figcaption><pre><code class="language-python">def func(idx_tensor, x, y):
+    condition = (idx_tensor % 2 == 0)   # GPU tensor
+    add_result = x + y
+    sub_result = x - y
+    z = torch.where(condition, add_result, sub_result)  # ✅
+    return z * x
+
+idx_tensor = torch.zeros(1, device="cuda", dtype=torch.int32)
+for i in range(6):
+    idx_tensor.fill_(i)  # update the GPU value every iteration
+    ...</code></pre></figure>
+    </div>
+    <div class="measure"><p class="cap"><b>Bug</b>, measured. Same as the page.</p>
+      <div class="strip-scroll"><div class="strip" data-ph="eeecrr" data-obs="2|0|2|0|0|0" data-exp="2|0|2|0|2|0"></div></div></div>
+    <div class="measure"><p class="cap"><b>All four fixes</b> (torch.where, a branching CUDA kernel, two graphs chosen on the CPU, partial capture) gave the same correct strip.</p>
+      <div class="strip-scroll"><div class="strip" data-ph="eeecrr" data-obs="2|0|2|0|2|0" data-exp="2|0|2|0|2|0"></div></div></div>
+    <div class="under"><div class="eyebrow">Underneath</div>
+      <ul>
+        <li><code>idx % 2</code> is evaluated by Python, once, at capture. The graph holds a subtract node and a multiply node, and <code>idx</code> is not an argument of either.</li>
+        <li><code>torch.where</code> works because the condition becomes a <em>tensor</em>. The select kernel reads it through a pointer at replay time, so <code>fill_(i)</code> before each replay changes the result. The cost is that both branches always run.</li>
+        <li>The custom kernel reads <code>idx[0]</code> from device memory and branches per thread, so only one path does work. It must be launched on <code>getCurrentCUDAStream()</code>, otherwise it is not captured (see <a href="#library">library streams</a>). It compiled with <code>load_inline</code> for sm_121 and ran correctly.</li>
+        <li>Two graphs (one per branch) and partial capture (branch in eager code, then a graph for the static rest) keep the decision on the CPU, outside the recording.</li>
+        <li>CUDA 12.4 added conditional graph nodes, but the page notes that PyTorch's graph API does not expose them yet.</li>
+      </ul></div>
+    <p class="cases">cases: control-flow/bug · fix-where · fix-kernel · fix-multi-graph · fix-partial</p>
+  </article>
+
+  <article class="ex" id="capture-aware">
+    <h3>Capture-aware code</h3>
+    <p class="what">Code that asks <code>is_current_stream_capturing()</code> and computes something different gets that
+      different computation baked into every replay.</p>
+    <div class="pair">
+      <figure class="code bug"><figcaption>Bug <small>page code</small></figcaption><pre><code class="language-python">def func(x, y):
+    z = x + y
+    if torch.cuda.is_current_stream_capturing():
+        z *= -1  # ❌ Different logic during capture!
+    return z</code></pre></figure>
+      <figure class="code fix"><figcaption>Fix <small>change how, never what</small></figcaption><pre><code class="language-python">def func(x, y):
+    z = x + y
+    if torch.cuda.is_current_stream_capturing():
+        torch.cuda._sleep(1000)  # ✅ graph-safe sleep alternative
+    else:
+        time.sleep(0.001)
+    return z</code></pre></figure>
+    </div>
+    <div class="measure"><p class="cap"><b>Bug</b>, measured (<code>y.fill_(i)</code> each iteration). Same as the page.</p>
+      <div class="strip-scroll"><div class="strip" data-ph="eeecrr" data-obs="0|1|2|-3|-4|-5" data-exp="0|1|2|3|4|5"></div></div></div>
+    <div class="under"><div class="eyebrow">Underneath</div>
+      <p>The check returns True during exactly one execution of the Python: the capture. The negation kernel is recorded,
+        and at replay time the check does not run at all, so it cannot "switch back". Changing <em>how</em> the same
+        result is computed is fine. Both fixes printed 0..5.</p></div>
+    <p class="cases">cases: capture-aware/bug · fix · fix-sleep</p>
+  </article>
+
+  <article class="ex" id="scalars">
+    <h3>Python scalars become constants</h3>
+    <p class="what">A Python number passed to an op becomes a kernel argument. Its capture-time value is copied into the graph node.</p>
+    <div class="pair">
+      <figure class="code bug"><figcaption>Bug <small>page code</small></figcaption><pre><code class="language-python">def func(tensor, exponent: int):  # exponent is a Python int
+    return torch.float_power(tensor, exponent)
+
+x = torch.tensor(2, device="cuda", dtype=torch.int32)
+# warmup i=0..2, capture at i=3, replay i=4,5
+y = func(x, i)  # ❌ i is baked in at capture</code></pre></figure>
+      <figure class="code fix"><figcaption>Fix <small>page code</small></figcaption><pre><code class="language-python">exponent_tensor = torch.zeros(1, device="cuda", dtype=torch.int32)
+
+with torch.cuda.graph(graph):
+    y = func(x, exponent_tensor)  # ✅ captures the address
+
+for i in range(3, 6):
+    exponent_tensor.fill_(i)  # update the value in place
+    graph.replay()</code></pre></figure>
+    </div>
+    <div class="measure"><p class="cap"><b>Bug</b>, measured (2<sup>i</sup>). Same as the page.</p>
+      <div class="strip-scroll"><div class="strip" data-ph="eeecrr" data-obs="1|2|4|8|8|8" data-exp="1|2|4|8|16|32"></div></div></div>
+    <div class="under"><div class="eyebrow">Underneath</div>
+      <ul>
+        <li>A kernel node stores a copy of the launch's argument bytes. A Python scalar is passed <em>by value</em> into those bytes: <code>3</code> is in the node itself.</li>
+        <li>A tensor is passed as a <em>pointer</em>. The kernel loads whatever is at that address when it runs, so <code>fill_</code> between replays changes the result.</li>
+        <li>Constants that never change (a dropout rate, a hidden size) are safe as Python values. Anything computed per step is not.</li>
+      </ul></div>
+    <p class="cases">cases: dynamic-scalar/bug · fix</p>
+  </article>
+
+  <article class="ex" id="hidden">
+    <h3>Hidden scalars: learning rate, step counter, GradScaler, RNG</h3>
+    <p class="what">The page warns about scalars that hide inside training loops. Each fragment was made runnable.</p>
+    <div class="pair">
+      <figure class="code bug"><figcaption>Bug <small>learning-rate schedule</small></figcaption><pre><code class="language-python">LRS = [1.0, 0.5, 0.25, 0.125]
+lr = LRS[0]
+with torch.cuda.graph(graph):
+    w.sub_(grad * lr)  # ❌ lr is a Python float
+
+for step in range(4):
+    lr = LRS[step]     # the graph keeps LRS[0]
+    graph.replay()</code></pre></figure>
+      <figure class="code fix"><figcaption>Fix <small>a device tensor</small></figcaption><pre><code class="language-python">lr_tensor = torch.zeros(1, device="cuda")
+with torch.cuda.graph(graph):
+    w.sub_(grad * lr_tensor)  # ✅
+
+for step in range(4):
+    lr_tensor.fill_(LRS[step])
+    graph.replay()</code></pre></figure>
+    </div>
+    <div class="measure"><p class="cap"><b>Learning-rate bug</b>, measured: <code>w</code> after each step, with grad = 1.</p>
+      <div class="strip-scroll"><div class="strip" data-ph="rrrr" data-labels="step 0|step 1|step 2|step 3" data-obs="-1|-2|-3|-4" data-exp="-1|-1.5|-1.75|-1.875"></div></div></div>
+    <div class="under"><div class="eyebrow">Underneath</div>
+      <ul>
+        <li><b>Step counter.</b> Same mechanism: <code>model(x, step=global_step)</code> froze the step at its capture value. A step tensor updated with <code>fill_</code> fixed it.</li>
+        <li><b>GradScaler.</b> The loss scale is already a device tensor (<code>scaler._scale</code>). <code>scale(loss)</code> multiplies by it through a pointer, and <code>update()</code> rewrites it in place. So capturing forward plus <code>scaler.scale(loss).backward()</code> and calling <code>step()</code> and <code>update()</code> in eager code is safe. With the scale doubling every step, the weights and scale matched an eager run exactly.
+          The page's ❌ variant puts <code>step()</code> inside the graph. That does not fail silently: <code>step()</code> checks <code>found_inf</code> on the host, a <code>cuStreamSynchronize</code>, and capture aborts with <em>operation not permitted when stream is capturing</em>.</li>
+        <li><b>RNG.</b> A random kernel in a graph reads its seed and offset through device pointers. PyTorch's generator header describes how each replay first advances that offset by the graph's total consumption. So 5 replays of a captured dropout gave 5 different masks.
+          On torch 2.14 this also held for a custom <code>torch.Generator</code> that was never passed to <code>register_generator_state</code>. The generator creates per-capture state on first use.</li>
+      </ul></div>
+    <p class="cases">cases: hidden-scalar/lr-bug · lr-fix · step-counter-bug · step-counter-fix · grad-scaler-bug · grad-scaler-fix · rng/default-auto · default-registered · custom-unregistered · custom-registered</p>
+  </article>
+
+  <article class="ex" id="shapes">
+    <h3>Dynamic shapes</h3>
+    <p class="what">Launch shapes are fixed at capture. A graph captured for 4 elements processes 4 elements, always.</p>
+    <div class="pair">
+      <figure class="code bug"><figcaption>Bug <small>page code</small></figcaption><pre><code class="language-python">x = torch.ones(4, device="cuda", dtype=torch.int32)
+with torch.cuda.graph(graph):
+    y = x * 2
+
+x_large = torch.ones(8, device="cuda", dtype=torch.int32) * 5
+x.copy_(x_large[:4])  # ❌ only 4 elements fit the captured input
+graph.replay()</code></pre></figure>
+      <figure class="code fix"><figcaption>Fix <small>pad to a maximum, or bucket</small></figcaption><pre><code class="language-python">static_input = torch.zeros(1024, device="cuda")
+with torch.cuda.graph(g):
+    static_output = model(static_input)
+
+for data in dataloader:
+    n = data.shape[0]
+    static_input[:n].copy_(data)
+    static_input[n:].zero_()             # ✅ zero padding
+    g.replay()
+    result = static_output[:n].clone()   # trim</code></pre></figure>
+    </div>
+    <div class="measure"><p class="cap"><b>Bug</b>, measured: the 8 requested outputs. Same as the page.</p>
+      <div class="strip-scroll"><div class="strip" data-labels="0|1|2|3|4|5|6|7" data-obs="10|10|10|10|—|—|—|—" data-exp="10|10|10|10|10|10|10|10"></div></div></div>
+    <div class="under"><div class="eyebrow">Underneath</div>
+      <p>The grid size and the element count are part of the recorded launch, and the input and output buffers were
+        allocated for 4 elements. There is nowhere to put element 5. Padding to one maximum wastes compute on zeros.
+        Bucketing captures one graph per size class: sizes 3, 8 and 5 ran through buckets 4, 8 and 8 and came out correct.
+        vLLM does the same per padded batch size. In topic 01, Step C, that came to 2995 graph instantiations.</p></div>
+    <p class="cases">cases: dynamic-shape/bug · fix-pad · fix-bucket</p>
+  </article>
+
+  <article class="ex" id="host-state">
+    <h3>Host-side state mutated inside the graph</h3>
+    <p class="what">A counter incremented inside the captured function increments during capture only. Eager code after the graph then reads a frozen value.</p>
+    <div class="pair">
+      <figure class="code bug"><figcaption>Bug <small>page code</small></figcaption><pre><code class="language-python">def graphed_func(state, x):
+    y = x * 1
+    state[0] = state[0] + 1  # ❌ skipped during replay
+    return y
+
+def eager_func(state, x):
+    if state[0] % 2 == 0:
+        x *= -1
+    return x</code></pre></figure>
+      <figure class="code fix"><figcaption>Fix <small>a GPU tensor for the state</small></figcaption><pre><code class="language-python">def graphed_func(state_tensor, x):
+    y = x * 1
+    state_tensor += 1  # ✅ captured and replayed
+    return y
+
+# eager code reads state_tensor.item() after replay
+# (or: do state[0] += 1 outside the graph)</code></pre></figure>
+    </div>
+    <div class="measure"><p class="cap"><b>Bug</b>, measured: y after <code>eager_func</code>. The state reads 1, 2, 3, 4, 4, 4 instead of 1..6. Same as the page.</p>
+      <div class="strip-scroll"><div class="strip" data-ph="eeecrr" data-obs="1|-1|1|-1|-1|-1" data-exp="1|-1|1|-1|1|-1"></div></div></div>
+    <div class="under"><div class="eyebrow">Underneath</div>
+      <p><code>state[0] += 1</code> is a CPU instruction. It never becomes a node. The same applies to <code>list.append</code>,
+        dictionary updates and <code>self.step = i</code>. If code outside the graph depends on the value, either mutate it
+        outside, or make it a tensor that a captured kernel updates.</p></div>
+    <p class="cases">cases: host-state/bug · fix-outside · fix-gpu-tensor</p>
+  </article>
+</section>
+
+<!-- ================================================================ ADDRESSES -->
+<section id="addresses">
+  <div class="sec-head">
+    <div class="eyebrow">Frozen pointers</div>
+    <h2>Addresses</h2>
+    <div class="prose"><p>A graph doesn't know about Python variables or tensor objects, only raw addresses. Anything that
+      changes <em>what lives at</em> an address breaks it silently: rebinding a name, freeing a tensor, reusing a buffer
+      across replays, two graphs handed the same block.</p></div>
+  </div>
+
+  <article class="ex" id="reassigned">
+    <h3>Reassigned inputs</h3>
+    <p class="what">Rebinding a Python name to a new tensor moves the name. The graph keeps reading the old address.</p>
+    <div class="pair">
+      <figure class="code bug"><figcaption>Bug <small>page code</small></figcaption><pre><code class="language-python">for i in range(2):                  # warmup
+    lr = base_lr + i  # ❌ Creates NEW tensor each iteration
+    out = 1 * lr
+
+with torch.cuda.graph(graph):       # captures lr's address (holds 1)
+    out = 1 * lr
+
+for i in range(2, 6):
+    lr = base_lr + i    # new tensor, new address
+    graph.replay()</code></pre></figure>
+      <figure class="code fix"><figcaption>Fix <small>page code</small></figcaption><pre><code class="language-python">lr = torch.zeros(1, device="cuda", dtype=torch.int32)  # once
+
+for i in range(2):
+    lr.copy_(base_lr + i)  # ✅ Update values, same address
+    out = 1 * lr
+
+with torch.cuda.graph(graph):
+    out = 1 * lr
+
+for i in range(2, 6):
+    lr.copy_(base_lr + i)
+    graph.replay()</code></pre></figure>
+    </div>
+    <div class="measure"><p class="cap"><b>Bug</b>, measured. Same as the page.</p>
+      <div class="strip-scroll"><div class="strip" data-ph="eerrrr" data-obs="0|1|1|1|1|1" data-exp="0|1|2|3|4|5"></div></div></div>
+    <div class="diagram"><div class="eyebrow">What the name and the graph point at, at i = 4</div>
+      <div class="mem">
+        <div class="mem-row"><span class="addr">block A</span><div class="blk"><span class="chip g2">lr from i=1 · value 1 · freed at i=2</span><span class="chip">← the graph's mul node reads here</span></div></div>
+        <div class="mem-row"><span class="addr">block B</span><div class="blk"><span class="chip">lr from i=4 · value 4</span><span class="chip">← the Python name <span class="mono">lr</span> now points here</span></div></div>
+      </div></div>
+    <div class="under"><div class="eyebrow">Underneath</div>
+      <p>Block A is freed at i = 2, the moment the name moves on. This run still read 1 only because the caching
+        allocator happened to hand other free blocks to the later tensors. Once A is recycled, the graph reads someone
+        else's data (next example). Watch for
+        hidden inputs that cross the graph boundary: globals, preprocessing outputs, module attributes and caches.</p></div>
+    <p class="cases">cases: dynamic-input/bug · fix</p>
+  </article>
+
+  <article class="ex" id="autocast">
+    <h3>The autocast weight cache</h3>
+    <p class="what">Under autocast, the FP16 copy of a weight is cached. A graph that uses the cached copy never sees the weight change.</p>
+    <div class="pair">
+      <figure class="code bug"><figcaption>Bug <small>page code</small></figcaption><pre><code class="language-python">w = torch.ones(1, 1, device="cuda", requires_grad=True)
+with torch.amp.autocast("cuda"):
+    _ = x @ w                 # w cast to FP16 and cached
+    with torch.cuda.graph(g):
+        y = x @ w             # ❌ reads the cached FP16 copy
+
+g.replay()                    # y = 1
+with torch.no_grad():
+    w.fill_(2)
+g.replay()                    # y is still 1</code></pre></figure>
+      <figure class="code fix"><figcaption>Fix <small>page code, plus a warmup</small></figcaption><pre><code class="language-python"># Option 1: no cache, so the cast kernel is captured
+with torch.amp.autocast("cuda", cache_enabled=False):
+    with torch.cuda.graph(g):
+        y = x @ w             # ✅
+
+# Option 2: autocast inside the capture
+with torch.amp.autocast("cuda"):
+    _ = x @ w                 # warmup (cuBLAS init), see below
+with torch.cuda.graph(g):
+    with torch.amp.autocast("cuda"):
+        y = x @ w             # ✅</code></pre></figure>
+    </div>
+    <div class="measure"><p class="cap"><b>Bug</b>, measured. Same as the page.</p>
+      <div class="strip-scroll"><div class="strip" data-labels="w = 1|w = 2" data-obs="1.0|1.0" data-exp="1.0|2.0"></div></div></div>
+    <div class="under"><div class="eyebrow">Underneath</div>
+      <p>Autocast caches the casted copy of a leaf tensor that requires grad, for as long as the autocast context lives. In
+        the bug, the warmup filled the cache. The captured matmul therefore reads the cached FP16 buffer, and no cast kernel
+        is recorded. Writing new values into <code>w</code> never reaches that buffer. After the context exits, the cache
+        entry is dropped, so its memory can also be recycled under the graph. With the cache disabled, or with autocast
+        entered inside the capture, the cast is a node, and replay re-casts <code>w</code> each time.</p></div>
+    <div class="note-214"><div class="eyebrow">On torch 2.14</div>
+      <p>Option 2 as printed on the page has no warmup. In a fresh process its matmul is the first one, so cuBLAS creates
+        its handle inside the capture, and capture fails with <code>CUBLAS_STATUS_NOT_INITIALIZED</code>. One eager matmul
+        first, the usual "warm up before capture" rule, fixes it.</p></div>
+    <p class="cases">cases: autocast-cache/bug · fix-no-cache · fix-inside</p>
+  </article>
+
+  <article class="ex" id="freed">
+    <h3>Freed inputs</h3>
+    <p class="what">When the last Python reference to a graph input goes away, the caching allocator gives its block to the next request of that size.</p>
+    <div class="pair">
+      <figure class="code bug"><figcaption>Bug <small>page code</small></figcaption><pre><code class="language-python">def capture_graph():
+    static_input = torch.ones(4, device="cuda")  # ❌ local
+    g = torch.cuda.CUDAGraph()
+    with torch.cuda.graph(g):
+        output = static_input * 2
+    return g, output        # static_input freed here
+
+g, output = capture_graph()
+other_tensor = torch.randn(4, device="cuda")
+g.replay()                  # reads other_tensor's values</code></pre></figure>
+      <figure class="code fix"><figcaption>Fix <small>page code</small></figcaption><pre><code class="language-python">def capture_graph():
+    static_input = torch.ones(4, device="cuda")
+    g = torch.cuda.CUDAGraph()
+    with torch.cuda.graph(g):
+        output = static_input * 2
+    return g, static_input, output  # ✅ keep it alive
+
+g, static_input, output = capture_graph()
+static_input.fill_(3)
+g.replay()                  # [6., 6., 6., 6.]</code></pre></figure>
+    </div>
+    <div class="measure"><p class="cap"><b>Bug</b>, measured: the 4 output elements.</p>
+      <div class="strip-scroll"><div class="strip" data-labels="0|1|2|3" data-obs="-4.69|0.09|2.68|-0.62" data-exp="2|2|2|2"></div></div></div>
+    <div class="diagram"><div class="eyebrow">Addresses from the run</div>
+      <div class="mem">
+        <div class="mem-row"><span class="addr">0x32ee00000</span><div class="blk"><span class="chip stale">static_input (freed on return)</span><span class="chip hot">other_tensor = randn(4)</span><span class="chip">← the graph's mul node still reads here</span></div></div>
+      </div>
+      <p style="font-size:0.88rem;color:var(--ink-2)">The output is 2 × randn: the replay doubled whatever <code>other_tensor</code> holds.</p></div>
+    <div class="note-214"><div class="eyebrow">On torch 2.14: the CPU-tensor variant</div>
+      <p>The page's second example frees a CPU tensor whose H2D copy was captured (<code>torch.tensor(i).to("cuda", non_blocking=True)</code>).
+        On torch 2.14 the copy is refused at capture: <em>Cannot copy between CPU and CUDA tensors during CUDA graph capture
+        unless the CPU tensor is pinned</em>. Both of the page's fixes fail the same way, including <code>torch.tensor(i, device="cuda")</code>,
+        which is itself a pageable copy. A graph-safe replacement is <code>torch.full((), i, device="cuda")</code>, a fill kernel.</p>
+      <p>We rebuilt the bug with pinned memory, and it still did not reproduce. After capture, new pinned tensors landed at
+        0x32ee00200, never at the captured block 0x32ee00000. In eager mode the same allocator does reuse a freed pinned
+        block once its copy has finished. So PyTorch now withholds host blocks used by a capture.</p></div>
+    <p class="cases">cases: freed-cuda-input/bug · fix · freed-cpu-input/bug · fix-keep-alive · fix-gpu-tensor · bug-pinned · fix-pinned-keep-alive · fix-full</p>
+  </article>
+
+  <article class="ex" id="outputs">
+    <h3>Output tensor reuse</h3>
+    <p class="what">A graph's output is one buffer that every replay overwrites. Appending it to a list appends the same buffer three times.</p>
+    <div class="pair">
+      <figure class="code bug"><figcaption>Bug <small>page code</small></figcaption><pre><code class="language-python">with torch.cuda.graph(graph):
+    y = x ** 2 + 1
+
+ys = []
+for i in range(3):
+    x.fill_(i)
+    graph.replay()
+    ys.append(y)  # ❌ Appending reference to same tensor!
+out = torch.sum(torch.cat(ys))</code></pre></figure>
+      <figure class="code fix"><figcaption>Fix <small>page code</small></figcaption><pre><code class="language-python">ys = []
+for i in range(3):
+    x.fill_(i)
+    graph.replay()
+    ys.append(y.clone())  # ✅ Clone to preserve each result
+out = torch.sum(torch.cat(ys))</code></pre></figure>
+    </div>
+    <div class="measure"><p class="cap"><b>Bug</b>, measured. Same as the page.</p>
+      <div class="strip-scroll"><div class="strip" data-labels="ys[0]|ys[-1]|sum" data-obs="5|5|15" data-exp="1|5|8"></div></div></div>
+    <div class="under"><div class="eyebrow">Underneath</div>
+      <p>In eager mode, each forward pass allocates a fresh output, so keeping references is safe. In a graph, the output
+        was allocated once, in the graph's pool, and its address is part of the recording. This matters for accumulating
+        predictions, metrics, gradient accumulation and pipeline stages. It also matters across graphs that share a pool:
+        another graph's replay can overwrite your output too (next example).</p></div>
+    <p class="cases">cases: output-reuse/bug · fix</p>
+  </article>
+
+  <article class="ex" id="shared-pool">
+    <h3>Graphs sharing a memory pool</h3>
+    <p class="what">With <code>pool=graph1.pool()</code>, graph 2 is allocated as if it runs after graph 1. Replaying in another order lets graph 1's scratch memory land on graph 2's output.</p>
+    <div class="pair">
+      <figure class="code bug"><figcaption>Bug <small>page code</small></figcaption><pre><code class="language-python">def func1(x1):
+    t1 = x1 * 3       # intermediate
+    return t1 + 5     # y1 = 8
+def func2(x2):
+    return x2 ** 2    # y2 = 4
+
+with torch.cuda.graph(graph1):
+    y1 = func1(x1)
+with torch.cuda.graph(graph2, pool=graph1.pool()):
+    y2 = func2(x2)
+
+graph2.replay()       # y2 = 4
+graph1.replay()       # ❌ t1 = 3 written over y2</code></pre></figure>
+      <figure class="code fix"><figcaption>Fix <small>any one of three</small></figcaption><pre><code class="language-python"># 1. read each output before another graph replays
+graph2.replay(); result2 = y2.clone()
+graph1.replay(); result1 = y1.clone()
+
+# 2. don't share the pool
+with torch.cuda.graph(graph2):   # no pool= argument
+    y2 = func2(x2)
+
+# 3. replay in capture order  ✅
+graph1.replay()
+graph2.replay()</code></pre></figure>
+    </div>
+    <div class="measure"><p class="cap"><b>Bug</b>, measured. Same as the page, and all three fixes gave 8 and 4.</p>
+      <div class="strip-scroll"><div class="strip" data-labels="y1|y2" data-obs="8|3" data-exp="8|4"></div></div></div>
+    <div class="diagram"><div class="eyebrow">The shared pool, with addresses printed during capture</div>
+      <div class="mem">
+        <div class="mem-row"><span class="addr">0x327e00000</span><div class="blk"><span class="chip g1">graph 1: t1 (scratch, freed at end of capture)</span><span class="chip g2">graph 2: y2 (output)</span></div></div>
+        <div class="mem-row"><span class="addr">0x327e00200</span><div class="blk"><span class="chip g1">graph 1: y1 (output)</span></div></div>
+      </div>
+      <ol class="steps">
+        <li><code>graph2.replay()</code> writes y2 = 4 into 0x327e00000.</li>
+        <li><code>graph1.replay()</code> writes t1 = 1 × 3 = 3 into 0x327e00000, then y1 = 8.</li>
+        <li>Reading y2 now gives 3.</li>
+      </ol></div>
+    <div class="under"><div class="eyebrow">Underneath</div>
+      <p>During capture the pool behaves like the normal caching allocator. When graph 1's capture ends, <code>t1</code> has
+        no Python reference, so its block goes back to the pool's free list, and graph 2's capture is handed that block for
+        <code>y2</code>. That assignment is correct only if graph 1 always finishes before graph 2 runs. The page's rule of
+        thumb: when sharing a pool, replay in capture order, and never concurrently.</p></div>
+    <div class="note-214"><div class="eyebrow">A bug this harness made itself</div>
+      <p>The first version of the "read immediately" fix printed <b>17</b> instead of 8. The helper that built the graphs
+        created <code>x1</code> locally and didn't return it, so x1 (at 0x32ee00000) was freed. The <code>y2.clone()</code>
+        was handed that block and wrote 4 into it. <code>graph1</code> then computed 4 × 3 + 5 = 17. That is exactly the
+        <a href="#freed">freed-input</a> bug, made by accident in code written to show a different one. The other
+        shared-pool cases allocated nothing in between, so they looked fine.</p></div>
+    <p class="cases">cases: shared-pool/bug · fix-read-immediately · fix-separate-pools · fix-capture-order</p>
+  </article>
+
+  <article class="ex" id="replay-order">
+    <h3>Replay order with <code>make_graphed_callables</code></h3>
+    <p class="what">Graphing several callables at once makes six graphs (a forward and a backward each) in one pool. Interleaving them the way pipeline parallelism does corrupts gradients.</p>
+    <div class="pair">
+      <figure class="code bug"><figcaption>Bug <small>page code</small></figcaption><pre><code class="language-python">func = lambda x: x ** 2 + 2 * x + 1      # d/dx = 2x + 2
+graphed = torch.cuda.make_graphed_callables(
+    (func, func, func), ((x0,), (x1,), (x2,)))
+
+y0 = graphed[0](x0)    # ❌ interleaved
+y1 = graphed[1](x1)
+y0.backward()
+y2 = graphed[2](x2)
+y1.backward()
+y2.backward()</code></pre></figure>
+      <figure class="code fix"><figcaption>Fix <small>the order the source documents</small></figcaption><pre><code class="language-python">graphed = torch.cuda.make_graphed_callables(
+    (func, func, func), ((x0,), (x1,), (x2,)))
+
+ys = [g(x) for g, x in zip(graphed, (x0, x1, x2))]
+for y in reversed(ys):  # ✅ fwd 0,1,2 then bwd 2,1,0
+    y.backward()
+
+# also correct: one make_graphed_callables call per function
+# (one pool each), or capturing manually in replay order</code></pre></figure>
+    </div>
+    <div class="measure"><p class="cap"><b>Bug</b>, measured gradients for x = 1, 2, 3. Same as the page.</p>
+      <div class="strip-scroll"><div class="strip" data-labels="x0.grad|x1.grad|x2.grad" data-obs="6|3|8" data-exp="4|6|8"></div></div></div>
+    <div class="diagram"><div class="eyebrow">Capture order versus replay order (F = forward graph, B = backward graph)</div>
+      <div class="order">
+        <div class="order-row"><span>Captured, per <span class="mono">torch/cuda/graphs.py</span></span><div class="seq"><span class="op f">F0</span><span class="op f">F1</span><span class="op f">F2</span><span class="op b">B2</span><span class="op b">B1</span><span class="op b">B0</span></div><span class="res"></span></div>
+        <div class="order-row"><span>Captured, as the page says</span><div class="seq"><span class="op f">F0</span><span class="op b">B0</span><span class="op f">F1</span><span class="op b">B1</span><span class="op f">F2</span><span class="op b">B2</span></div><span class="res"></span></div>
+        <div class="order-row"><span>Bug replay</span><div class="seq"><span class="op f">F0</span><span class="op f">F1</span><span class="op b off">B0</span><span class="op f off">F2</span><span class="op b off">B1</span><span class="op b off">B2</span></div><span class="res bad">6, 3, 8</span></div>
+        <div class="order-row"><span>Page's "fix" replay</span><div class="seq"><span class="op f">F0</span><span class="op b off">B0</span><span class="op f off">F1</span><span class="op b off">B1</span><span class="op f off">F2</span><span class="op b">B2</span></div><span class="res bad">6, 3, 8</span></div>
+        <div class="order-row"><span>Documented order</span><div class="seq"><span class="op f">F0</span><span class="op f">F1</span><span class="op f">F2</span><span class="op b">B2</span><span class="op b">B1</span><span class="op b">B0</span></div><span class="res ok">4, 6, 8</span></div>
+      </div>
+      <p style="font-size:0.85rem;color:var(--ink-2)">Highlighted steps are out of place relative to the real capture order.</p></div>
+    <div class="under"><div class="eyebrow">Underneath</div>
+      <p>The pool's addresses were assigned by simulating execution in capture order: a buffer that is dead after one graph
+        is handed to the next. Saved activations that a backward graph needs are only guaranteed intact if the graphs in
+        between are the ones the capture assumed. The source comment in <code>make_graphed_callables</code> says it
+        captures "fwd 1, fwd 2, ... fwd N, then bwd N, bwd N-1, ... bwd 1". Its docstring says the tuple order must be the
+        order the callables run in the live workload.</p></div>
+    <div class="note-214"><div class="eyebrow">On torch 2.14</div>
+      <p>The page's fix 1 (<code>y0.backward()</code> right after <code>f0</code>, and so on) assumes alternating capture.
+        It is itself a mismatch and produced the same wrong gradients as the bug. Its other two fixes (separate pools, or
+        capturing manually in replay order) work.</p></div>
+    <p class="cases">cases: replay-order/bug · fix-capture-order (page, wrong) · fix-documented-order · fix-separate-pools · fix-capture-in-replay-order</p>
+  </article>
+</section>
+
+<!-- ================================================================ RECORDED -->
+<section id="recorded">
+  <div class="sec-head">
+    <div class="eyebrow">Missing nodes</div>
+    <h2>Which work was recorded</h2>
+    <div class="prose"><p>Capture is per stream. Work on the capturing stream, or on a stream joined to it through events,
+      becomes nodes. Work sent anywhere else executes once, immediately, and is gone from every replay. Python that
+      dispatches the work, like a submodule's <code>forward</code> and its hooks, is not part of the graph either.</p></div>
+  </div>
+
+  <article class="ex" id="library">
+    <h3>A library that launches on the default stream</h3>
+    <p class="what">A library that hard-codes the default stream works in eager mode. Under capture, its kernel is never recorded.</p>
+    <div class="pair">
+      <figure class="code bug"><figcaption>Bug <small>page code</small></figcaption><pre><code class="language-python">def library_call(x):
+    stream = torch.cuda.default_stream()  # ❌ assumes default stream
+    with torch.cuda.stream(stream):
+        return x * 2
+
+with torch.cuda.graph(graph):
+    y = x + 1              # captured on the capture stream
+    y = library_call(y)    # runs on the default stream</code></pre></figure>
+      <figure class="code fix"><figcaption>Fix <small>page code</small></figcaption><pre><code class="language-python"># A: use the stream you are given (the capture stream)
+def library_call_a(x, stream):
+    with torch.cuda.stream(stream):
+        return x * 2
+
+# B: fork an internal stream from it and join back
+def library_call_b(x, stream):
+    internal = torch.cuda.Stream()
+    internal.wait_stream(stream)        # ✅ fork
+    with torch.cuda.stream(internal):
+        result = x * 2
+    stream.wait_stream(internal)        # ✅ join
+    return result</code></pre></figure>
+    </div>
+    <div class="measure"><p class="cap"><b>Bug</b>, measured: y = (i + 1) × 2. Same as the page.</p>
+      <div class="strip-scroll"><div class="strip" data-ph="eeerrr" data-labels="i=0|i=1|i=2|i=4|i=5|i=6" data-obs="2|4|6|0|0|0" data-exp="2|4|6|10|12|14"></div></div></div>
+    <div class="under"><div class="eyebrow">Underneath</div>
+      <ul>
+        <li><code>torch.cuda.graph</code> captures on a side stream. <code>x + 1</code> goes there and becomes a node writing into the graph pool. It has not executed.</li>
+        <li><code>x * 2</code> goes to the default stream and <em>executes right away</em>. It reads the pool buffer that <code>x + 1</code> will only fill at replay time. In this run that buffer held 0, so the result was 0, written into an ordinary tensor. The Python name <code>y</code> now points at that tensor, and no replay ever writes it.</li>
+        <li>No error was raised in this run, so the only symptom is the wrong value.</li>
+        <li>Option B works because <code>wait_stream</code> records an event on the capturing stream and makes the internal stream wait on it. That pulls the internal stream into the same capture. The join at the end is required before capture can end. This is how multi-stream work, such as the overlap patterns from topic 01, ends up inside one graph.</li>
+        <li>The page's diagnosis tool is a profiler timeline that shows which stream each kernel ran on. That is what <code>01-cuda-streams/nsys_streams.py</code> reports.</li>
+      </ul></div>
+    <p class="cases">cases: library-stream/bug · fix-current-stream · fix-pass-stream · fix-internal-stream</p>
+  </article>
+
+  <article class="ex" id="hooks">
+    <h3>Module hooks that never fire</h3>
+    <p class="what">After <code>make_graphed_callables</code>, only the top module's hooks run. The submodules' <code>forward</code> is never called.</p>
+    <div class="pair">
+      <figure class="code bug"><figcaption>Bug <small>page code</small></figcaption><pre><code class="language-python">model = torch.nn.Sequential(Embedding(4096, 4096),
+                            Linear(4096, 4096), Linear(4096, 4096))
+model = torch.cuda.make_graphed_callables(model, (inp,))
+
+for module in model.modules():          # 4 modules
+    module.register_forward_hook(hook)  # registered AFTER graphing
+model(inp)                               # ❌ only 1 hook fires</code></pre></figure>
+      <figure class="code fix"><figcaption>Workaround <small>one top-level hook</small></figcaption><pre><code class="language-python">def hook(module, input, output):
+    # ✅ recurse=True reaches every parameter in the tree
+    for name, p in module.named_parameters(recurse=True):
+        ...
+
+model.register_forward_hook(hook)
+# measured: the hook saw all 5 parameters</code></pre></figure>
+    </div>
+    <div class="measure"><p class="cap"><b>Bug</b>, measured. Same as the page.</p>
+      <div class="strip-scroll"><div class="strip" data-labels="hooks called" data-obs="1" data-exp="4"></div></div></div>
+    <div class="under"><div class="eyebrow">Underneath</div>
+      <p>Hooks are dispatched by <code>Module.__call__</code>. <code>make_graphed_callables</code> replaces the top module's
+        <code>forward</code> with a function that replays the graph, so the top module's <code>__call__</code> still runs
+        (and its hook fires), but nothing ever calls the three submodules. Logging, activation caching or gradient tweaks
+        done in per-layer hooks silently stop. Either capture at a finer granularity with <code>CUDAGraph</code>, or move
+        that logic outside the graphed region.</p></div>
+    <p class="cases">cases: module-hooks/bug · workaround-top-level</p>
+  </article>
+</section>
+
+<!-- ================================================================ TIMING -->
+<section id="timing">
+  <div class="sec-head">
+    <div class="eyebrow">Async replay</div>
+    <h2>Replay is asynchronous</h2>
+    <div class="prose"><p><code>graph.replay()</code> returns as soon as the work is queued. Anything the CPU, or another
+      stream, does to the graph's memory afterwards races the queued work. These two examples belong to the
+      CUDA streams topic as much as to graphs.</p></div>
+  </div>
+
+  <article class="ex" id="pinned">
+    <h3>Writing pinned memory the GPU has not read yet</h3>
+    <p class="what">The graph's H2D copy reads a pinned host buffer. The CPU loop rewrites that buffer long before the queued copy gets to it.</p>
+    <div class="pair">
+      <figure class="code bug"><figcaption>Bug <small>page code</small></figcaption><pre><code class="language-python">def func(x):
+    torch.cuda._sleep(int(50 * cycles_per_ms))  # 50 ms of GPU work
+    x_cuda = x.to(device="cuda", non_blocking=True)
+    return x_cuda ** 2
+
+x = torch.empty(1, device="cpu", pin_memory=True)
+with torch.cuda.graph(graph):
+    y = func(x)
+for i in range(4):
+    x.fill_(i)        # ❌ CPU writes while the GPU may still read
+    graph.replay()    # asynchronous: returns immediately
+    outputs.append(y.clone())</code></pre></figure>
+      <figure class="code fix"><figcaption>Fix <small>page code</small></figcaption><pre><code class="language-python">event = torch.cuda.Event()
+for i in range(4):
+    event.synchronize()  # ✅ wait for the previous replay only
+    x.fill_(i)
+    graph.replay()
+    outputs.append(y.clone())
+    event.record()
+
+# or: torch.cuda.synchronize() before each write,
+# or: copy into a static CUDA tensor with x_cuda.copy_(x_cpu)</code></pre></figure>
+    </div>
+    <div class="measure"><p class="cap"><b>Graph bug</b>, measured (x²). Same as the page.</p>
+      <div class="strip-scroll"><div class="strip" data-ph="rrrr" data-labels="i=0|i=1|i=2|i=3" data-obs="9|9|9|9" data-exp="0|1|4|9"></div></div></div>
+    <div class="measure"><p class="cap"><b>Eager version</b> on a side stream, measured. Same as the page: not a graph-only bug.</p>
+      <div class="strip-scroll"><div class="strip" data-ph="eeee" data-labels="i=0|i=1|i=2|i=3" data-obs="0|9|9|9" data-exp="0|1|4|9"></div></div></div>
+    <div class="diagram"><div class="eyebrow">Graph bug, drawn to scale (0 to 200 ms)</div>
+      <div class="tl"><div class="tl-inner">
+        <div class="lane"><span class="name">CPU</span><div class="track">
+          <span class="tick" style="left:0.2%" title="x.fill_(0)"></span><span class="tick" style="left:0.6%" title="x.fill_(1)"></span>
+          <span class="tick" style="left:1.0%" title="x.fill_(2)"></span><span class="tick" style="left:1.4%" title="x.fill_(3)"></span>
+          <span class="seg" style="left:3%;right:auto;width:60%;justify-content:flex-start;color:var(--ink-2)">← four writes, x = 0, 1, 2, 3, all before the first sleep ends</span>
+        </div></div>
+        <div class="lane"><span class="name">GPU</span><div class="track">
+          <span class="seg sleep" style="left:0%;width:24.6%">sleep 50 ms</span><span class="seg copy" style="left:24.7%"></span>
+          <span class="seg sleep" style="left:25.2%;width:24.6%">sleep 50 ms</span><span class="seg copy" style="left:49.9%"></span>
+          <span class="seg sleep" style="left:50.4%;width:24.6%">sleep 50 ms</span><span class="seg copy" style="left:75.1%"></span>
+          <span class="seg sleep" style="left:75.6%;width:24.0%">sleep 50 ms</span><span class="seg copy" style="left:99.6%"></span>
+        </div></div>
+        <div class="axis"><span></span><div class="scale"><span>0</span><span>50</span><span>100</span><span>150</span><span>200 ms</span></div></div>
+      </div></div>
+      <div class="tl-key"><span><i style="background:var(--capture)"></i>CPU writes the pinned buffer</span><span><i style="background:var(--bad)"></i>queued H2D copy reads it: always 3</span></div></div>
+    <div class="under"><div class="eyebrow">Underneath</div>
+      <ul>
+        <li>A <code>non_blocking</code> copy from pinned memory is a DMA that reads the host buffer <em>when the copy engine gets to it</em>, not when you call it. The graph recorded that host address.</li>
+        <li><code>replay()</code> and <code>clone()</code> only enqueue, so the CPU finishes its four iterations while the GPU is still in the first 50 ms sleep. Every copy then reads 3, and every output is 9.</li>
+        <li>An event recorded after the replay and synchronized before the next write lets the CPU wait for exactly the work that reads the buffer, without draining the whole device. All three fixes gave 0, 1, 4, 9.</li>
+        <li><code>x_cuda.copy_(x_cpu)</code> is safe for a different reason. A blocking copy from pinned memory makes the host wait until the copy is done, so it is ordered behind the previous replay. It also gives up the overlap.</li>
+        <li>Topic 01 showed the other half of this trade-off: pageable copies block the host (safe but slow), and pinned ones don't (fast, but now you own the synchronization).</li>
+      </ul></div>
+    <p class="cases">cases: pinned/bug-eager · bug-graph · fix-synchronize · fix-event · fix-cuda-input</p>
+  </article>
+
+  <article class="ex" id="parallel">
+    <h3>Replaying pool-sharing graphs on several streams</h3>
+    <p class="what">Three graphs captured into one pool, replayed concurrently on three streams, write each other's scratch buffers.</p>
+    <div class="pair">
+      <figure class="code bug"><figcaption>Bug <small>page code</small></figcaption><pre><code class="language-python">f1 = lambda x: x ** 2 + 2 * x + 1     # x1 = 1 -> 4
+f2 = lambda x: x ** 2 + 2 * x + 2     # x2 = 2 -> 10
+f3 = lambda x: x ** 2 + 2 * x + 3     # x3 = 3 -> 18
+with torch.cuda.graph(g1): y1 = f1(x1)
+with torch.cuda.graph(g2, pool=g1.pool()): y2 = f2(x2)
+with torch.cuda.graph(g3, pool=g1.pool()): y3 = f3(x3)
+
+for _ in range(100):
+    with torch.cuda.stream(s1): g1.replay()  # ❌ concurrent
+    with torch.cuda.stream(s2): g2.replay()
+    with torch.cuda.stream(s3): g3.replay()</code></pre></figure>
+      <figure class="code fix"><figcaption>Fix <small>page code</small></figcaption><pre><code class="language-python"># 1. separate pools: safe to run concurrently  ✅
+with torch.cuda.graph(g2): y2 = f2(x2)   # no pool=
+
+# 2. or chain the streams so replays never overlap  ✅
+s1.wait_stream(torch.cuda.current_stream())
+with torch.cuda.stream(s1): g1.replay()
+s2.wait_stream(s1)
+with torch.cuda.stream(s2): g2.replay()
+s3.wait_stream(s2)
+with torch.cuda.stream(s3): g3.replay()</code></pre></figure>
+    </div>
+    <div class="measure"><p class="cap"><b>Bug</b>, measured with 268,435,456-element (1 GiB) tensors. Every element of y2 and y3 was wrong. The page shows 13, 12, 19; the values depend on timing.</p>
+      <div class="strip-scroll"><div class="strip" data-labels="y1[0]|y2[0]|y3[0]" data-obs="4|7|11" data-exp="4|10|18"></div></div></div>
+    <div class="under"><div class="eyebrow">Underneath</div>
+      <ul>
+        <li>Each <code>f</code> needs scratch buffers (<code>x**2</code>, <code>2*x</code>). Captured one after another into one pool, the three graphs were given the <em>same</em> scratch blocks, which is correct only if they run one at a time.</li>
+        <li>On three streams they overlap (each kernel is large enough to run tens of milliseconds), and all three write those blocks at once.</li>
+        <li>The measured values fit that picture: 7 = 1 + 4 + 2 (another graph's 1² next to its own 2·2) and 11 = 4 + 4 + 3 (graph 2's temporaries in graph 3's sum). The addresses weren't logged for this case, so this is consistent arithmetic, not proof.</li>
+        <li>Both fixes left 0 wrong elements out of 268,435,456 per output. Topic 01's rule applies unchanged: streams give permission to overlap, and overlap is only correct when the two sides share no memory.</li>
+      </ul></div>
+    <p class="cases">cases: parallel-replay/bug · fix-separate-pools · fix-serialize</p>
+  </article>
+</section>
+
+<!-- ================================================================ DEBUGGING -->
+<section id="debugging">
+  <div class="sec-head">
+    <div class="eyebrow">Diagnosis</div>
+    <h2>Finding the first bad layer</h2>
+    <div class="prose"><p>The page's recipe: make execution deterministic, seed identically, clone every layer's output in
+      eager mode and inside the capture, replay, then compare layer by layer and stop at the first difference. Its
+      snippet leaves the model out. Here the model is four Linear + tanh blocks, and block 2 contains the page's "different
+      precision during capture" anti-pattern.</p></div>
+  </div>
+  <div class="pair">
+    <figure class="code bug"><figcaption>Planted bug <small>block 2</small></figcaption><pre><code class="language-python">def forward(self, x):
+    x = torch.tanh(self.lin(x))
+    if self.buggy and torch.cuda.is_current_stream_capturing():
+        x = x.half().float()  # ❌ different precision during capture
+    return x</code></pre></figure>
+    <figure class="code fix"><figcaption>Recipe <small>page code, condensed</small></figcaption><pre><code class="language-python">torch.use_deterministic_algorithms(True)
+torch.manual_seed(42); torch.cuda.manual_seed(42)
+# eager: append layer(x).clone() for each layer
+# graph: same loop inside torch.cuda.graph(g), then g.replay()
+for i, (e, g) in enumerate(zip(eager_out, graph_out)):
+    diff = (e - g).abs().max()
+    if diff > 1e-5:
+        print(f"Issue first appears at layer {i}")  # ✅
+        break</code></pre></figure>
+  </div>
+  <div class="tbl-scroll"><table>
+    <thead><tr><th>Layer</th><th>Max |eager − graph|, planted bug</th><th>Without the bug</th></tr></thead>
+    <tbody>
+      <tr><td>0</td><td class="mono">0.00e+00</td><td class="mono">0.00e+00</td></tr>
+      <tr><td>1</td><td class="mono">0.00e+00</td><td class="mono">0.00e+00</td></tr>
+      <tr><td>2</td><td class="mono" style="color:var(--bad)">2.31e-04 · stops here</td><td class="mono">0.00e+00</td></tr>
+      <tr><td>3</td><td class="mono">not compared</td><td class="mono">0.00e+00</td></tr>
+    </tbody></table></div>
+  <div class="under"><div class="eyebrow">Underneath</div>
+    <p>Without the bug every layer matches exactly. Replay launches the same kernels on the same data as eager mode, so
+      any non-zero difference is a real behavioral change, not noise. 2.3e-4 is about the size of an FP16 rounding error
+      for values just below 1, which is where tanh outputs live. Note that the clones taken inside the capture are
+      themselves captured kernels: they only hold values after <code>g.replay()</code>.</p></div>
+</section>
+
+<!-- ================================================================ DIFFERENCES -->
+<section id="differences">
+  <div class="sec-head">
+    <div class="eyebrow">7 of 66 cases</div>
+    <h2>Where torch 2.14 differs from the page</h2>
+    <div class="prose"><p>Every difference was traced to a cause. Most of them are recent PyTorch turning a silent failure into a loud one, or into a non-issue.</p></div>
+  </div>
+  <div class="diffs">
+    <div class="diff"><div><h3>The replay-order fix is wrong</h3><p><code>make_graphed_callables</code> captures all forwards, then the backwards in reverse. The page's "fixed" alternating order still gives 6, 3, 8. <a href="#replay-order">Details</a></p></div></div>
+    <div class="diff"><div><h3>Pageable host copies are refused during capture</h3><p>The freed-CPU-tensor bug and both of its fixes fail at capture instead of returning garbage. <code>torch.full</code> is a graph-safe way to make the tensor on the GPU. <a href="#freed">Details</a></p></div></div>
+    <div class="diff"><div><h3>Captured pinned blocks are not recycled</h3><p>Rebuilt with pinned memory, the freed-host-tensor bug did not reproduce: the captured block was withheld from later allocations. <a href="#freed">Details</a></p></div></div>
+    <div class="diff"><div><h3>Unregistered custom generators still advance</h3><p>Per-capture generator state is created on first use, so explicit <code>register_generator_state</code> is optional on 2.14. <a href="#hidden">Details</a></p></div></div>
+    <div class="diff"><div><h3>GradScaler step inside the graph fails capture</h3><p>Its host-side <code>found_inf</code> check is a stream sync, so the page's ❌ variant raises instead of using a stale scale. <a href="#hidden">Details</a></p></div></div>
+    <div class="diff"><div><h3>The autocast-inside fix needs a warmup</h3><p>Without one, cuBLAS initializes inside the capture and the capture fails with <code>CUBLAS_STATUS_NOT_INITIALIZED</code>. <a href="#autocast">Details</a></p></div></div>
+  </div>
+  <p class="prose" style="color:var(--ink-2)">The first five items account for the seven differing cases; the pageable-copy item covers three of them. The sixth is a gap in the page's snippet: with the warmup added, that case matches the page.</p>
+</section>
+
+<!-- ================================================================ CHECKLIST -->
+<section id="checklist">
+  <div class="sec-head">
+    <div class="eyebrow">Practice</div>
+    <h2>Before you capture</h2>
+    <div class="prose"><p>Audit everything that crosses the boundary of the captured region. Most bugs on this page are
+      correct at the capture iteration and wrong only afterwards, so compare against eager mode on several iterations.</p></div>
+  </div>
+  <div class="checklist">
+    <div><h3>Every tensor read from outside</h3><p>Allocated once, kept alive for the graph's lifetime, updated with <code>copy_</code> or <code>fill_</code>. Never rebound.</p></div>
+    <div><h3>Every Python value</h3><p>A branch, scalar or shape is a constant of the graph. Make it a device tensor, or keep it outside and capture one graph per case.</p></div>
+    <div><h3>Every side effect</h3><p>Counters, appends, hooks and attribute writes happen once. Move them out, or into a GPU tensor.</p></div>
+    <div><h3>Every library launch</h3><p>It must use <code>torch.cuda.current_stream()</code>, or fork and join with <code>wait_stream</code>. Check in a profiler.</p></div>
+    <div><h3>Every output you keep</h3><p>The next replay overwrites it, and so may any graph that shares the pool. <code>clone()</code> what you keep.</p></div>
+    <div><h3>Every host buffer and stream</h3><p>Wait on an event before rewriting pinned inputs. Never replay pool-sharing graphs concurrently or out of capture order.</p></div>
+  </div>
+</section>
+
+<!-- ================================================================ ALL CASES -->
+<section id="all-cases">
+  <div class="sec-head">
+    <div class="eyebrow">Run log</div>
+    <h2>All 66 cases</h2>
+    <div class="prose"><p>A bug case is <b>reproduced</b> when its output differs from the correct one. A fix case is <b>correct</b> when it matches. Each case ran in its own process.</p></div>
+  </div>
+  <details class="all"><summary>Show the full verdict table</summary>
+    <div class="tbl-scroll"><table><thead><tr><th>Case</th><th>Kind</th><th>Verdict</th></tr></thead><tbody id="case-rows"></tbody></table></div>
+  </details>
+</section>
+
+</main>
+</div>
+
+<footer>
+  Reproduced from <a href="https://docs.nvidia.com/dl-cuda-graph/troubleshooting/numerical-errors.html">NVIDIA's CUDA Graph Troubleshooting: Numerical Errors</a>.
+  Code and raw log: <span class="mono">GPU-Study/02-cuda-graph-numerical-errors</span>. Measured on an NVIDIA GB10 (DGX Spark) with torch 2.14.1+cu130 and CUDA 13.0.
+</footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>
+(function () {
+  // ---- code blocks: syntax highlighting (if the library loaded), then per-line marks for the ❌ / ✅ lines
+  document.querySelectorAll("figure.code code").forEach(function (el) {
+    try { if (window.hljs) window.hljs.highlightElement(el); } catch (e) { /* plain text is fine */ }
+    var lines = el.innerHTML.split("\n");
+    el.innerHTML = lines.map(function (line) {
+      var cls = line.indexOf("❌") >= 0 ? " ln-bad" : (line.indexOf("✅") >= 0 ? " ln-good" : "");
+      return '<span class="ln' + cls + '">' + (line || " ") + "</span>";
+    }).join("");
+  });
+
+  // ---- iteration strips
+  var PHASE = { e: "warmup", c: "capture", r: "replay" };
+  document.querySelectorAll(".strip").forEach(function (el) {
+    var obs = el.dataset.obs.split("|"), exp = el.dataset.exp.split("|");
+    var ph = (el.dataset.ph || "").split("");
+    var labels = el.dataset.labels ? el.dataset.labels.split("|") : obs.map(function (_, i) { return "i=" + i; });
+    el.innerHTML = obs.map(function (o, i) {
+      var p = ph[i] || "", wrong = o !== exp[i];
+      return '<div class="cell' + (p ? " ph-" + p : "") + (wrong ? " wrong" : "") + '" aria-label="' + labels[i] + ": observed " + o + ", expected " + exp[i] + '">' +
+        '<span class="bar"></span><span class="lab">' + (p ? "<em>" + PHASE[p] + "</em>" : "") + labels[i] + "</span>" +
+        '<span class="obs">' + o + '</span><span class="exp">exp ' + exp[i] + "</span></div>";
+    }).join("");
+  });
+
+  // ---- the verdict table (from results/20261019-145927.txt)
+  var CASES = [
+    ["control-flow/bug","bug","REPRODUCED"],["control-flow/fix-where","fix","CORRECT"],["control-flow/fix-kernel","fix","CORRECT"],
+    ["control-flow/fix-multi-graph","fix","CORRECT"],["control-flow/fix-partial","fix","CORRECT"],["capture-aware/bug","bug","REPRODUCED"],
+    ["capture-aware/fix","fix","CORRECT"],["capture-aware/fix-sleep","fix","CORRECT"],["dynamic-input/bug","bug","REPRODUCED"],
+    ["dynamic-input/fix","fix","CORRECT"],["autocast-cache/bug","bug","REPRODUCED"],["autocast-cache/fix-no-cache","fix","CORRECT"],
+    ["autocast-cache/fix-inside","fix","CORRECT"],["dynamic-scalar/bug","bug","REPRODUCED"],["dynamic-scalar/fix","fix","CORRECT"],
+    ["hidden-scalar/lr-bug","bug","REPRODUCED"],["hidden-scalar/lr-fix","fix","CORRECT"],["hidden-scalar/step-counter-bug","bug","REPRODUCED"],
+    ["hidden-scalar/step-counter-fix","fix","CORRECT"],["hidden-scalar/grad-scaler-bug","bug","ERROR"],["hidden-scalar/grad-scaler-fix","fix","CORRECT"],
+    ["rng/default-auto","fix","CORRECT"],["rng/default-registered","fix","CORRECT"],["rng/custom-unregistered","bug","NOT REPRODUCED"],
+    ["rng/custom-registered","fix","CORRECT"],["dynamic-shape/bug","bug","REPRODUCED"],["dynamic-shape/fix-pad","fix","CORRECT"],
+    ["dynamic-shape/fix-bucket","fix","CORRECT"],["pinned/bug-eager","bug","REPRODUCED"],["pinned/bug-graph","bug","REPRODUCED"],
+    ["pinned/fix-synchronize","fix","CORRECT"],["pinned/fix-event","fix","CORRECT"],["pinned/fix-cuda-input","fix","CORRECT"],
+    ["freed-cuda-input/bug","bug","REPRODUCED"],["freed-cuda-input/fix","fix","CORRECT"],["freed-cpu-input/bug","bug","ERROR"],
+    ["freed-cpu-input/fix-keep-alive","fix","ERROR"],["freed-cpu-input/fix-gpu-tensor","fix","ERROR"],["freed-cpu-input/bug-pinned","bug","NOT REPRODUCED"],
+    ["freed-cpu-input/fix-pinned-keep-alive","fix","CORRECT"],["freed-cpu-input/fix-full","fix","CORRECT"],["output-reuse/bug","bug","REPRODUCED"],
+    ["output-reuse/fix","fix","CORRECT"],["host-state/bug","bug","REPRODUCED"],["host-state/fix-outside","fix","CORRECT"],
+    ["host-state/fix-gpu-tensor","fix","CORRECT"],["library-stream/bug","bug","REPRODUCED"],["library-stream/fix-current-stream","fix","CORRECT"],
+    ["library-stream/fix-pass-stream","fix","CORRECT"],["library-stream/fix-internal-stream","fix","CORRECT"],["module-hooks/bug","bug","REPRODUCED"],
+    ["module-hooks/workaround-top-level","fix","CORRECT"],["shared-pool/bug","bug","REPRODUCED"],["shared-pool/fix-read-immediately","fix","CORRECT"],
+    ["shared-pool/fix-separate-pools","fix","CORRECT"],["shared-pool/fix-capture-order","fix","CORRECT"],["replay-order/bug","bug","REPRODUCED"],
+    ["replay-order/fix-capture-order","fix","WRONG"],["replay-order/fix-documented-order","fix","CORRECT"],["replay-order/fix-separate-pools","fix","CORRECT"],
+    ["replay-order/fix-capture-in-replay-order","fix","CORRECT"],["parallel-replay/bug","bug","REPRODUCED"],["parallel-replay/fix-separate-pools","fix","CORRECT"],
+    ["parallel-replay/fix-serialize","fix","CORRECT"],["layer-diff/bug","bug","REPRODUCED"],["layer-diff/clean","fix","CORRECT"]
+  ];
+  var tbody = document.getElementById("case-rows");
+  tbody.innerHTML = CASES.map(function (c) {
+    return '<tr><td class="mono">' + c[0] + '</td><td><span class="pill kind">' + c[1] + '</span></td><td><span class="pill ' +
+      c[2].split(" ")[0] + '">' + c[2] + "</span></td></tr>";
+  }).join("");
+})();
+</script>
+
+</body>
+</html>

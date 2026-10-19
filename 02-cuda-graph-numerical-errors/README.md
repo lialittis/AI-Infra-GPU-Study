@@ -5,6 +5,9 @@ page, buggy and fixed, as runnable cases checked against the correct (eager-equi
 only a fragment (most fixes, the learning-rate / step-counter / GradScaler / RNG notes, the debugging recipe) it is
 completed into a runnable loop.
 
+For a visual walkthrough of every example (code side by side, measured values per iteration, address and
+timeline diagrams, and the mechanism behind each), open [explainer.html](explainer.html) in a browser.
+
 ## Summary
 
 - **One rule explains every failure:** a CUDA graph is a recorded list of GPU operations, each with its kernel
