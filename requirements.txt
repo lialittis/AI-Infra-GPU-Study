@@ -1,0 +1,2 @@
+# torch itself is installed by scripts/setup_venv.sh from the CUDA-matched index.
+numpy

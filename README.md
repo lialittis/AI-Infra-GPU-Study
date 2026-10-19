@@ -7,6 +7,15 @@ Hands-on study of AI infrastructure on NVIDIA GPUs: small, self-contained experi
 - An NVIDIA GPU with a recent driver
 - CUDA toolkit (`nvcc`). The Makefiles default to `CUDA_HOME=/usr/local/cuda` and `-arch=native`; override with `make CUDA_HOME=... ARCH=sm_90`
 
+## Python environment
+
+```bash
+scripts/setup_venv.sh     # creates .venv with PyTorch matching the driver's CUDA version
+```
+
+If `import torch` aborts with `malloc(): corrupted top size` inside a CPU-restricted container, see
+[tools/cpuinfo-fix](tools/cpuinfo-fix/README.md).
+
 ## Running
 
 Directly on a GPU machine:
