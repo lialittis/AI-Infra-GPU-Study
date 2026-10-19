@@ -23,6 +23,7 @@ Directly on a GPU machine:
 ```bash
 git clone <this repo> && cd GPU-Study
 ./01-cuda-streams/run_all.sh          # builds, runs, writes 01-cuda-streams/results/<timestamp>.txt
+./01-cuda-streams/pytorch/run.sh      # needs .venv and nsys; writes 01-cuda-streams/results/stepB-<timestamp>.txt
 ```
 
 Or edit locally and run on a remote GPU server with `scripts/remote.sh`. Configure it once with `cp .remote.env.example .remote.env` (gitignored), then:
@@ -38,6 +39,6 @@ scripts/remote.sh shell                           # interactive shell in the rem
 
 | # | Topic | Status |
 |---|---|---|
-| 01 | [CUDA streams](01-cuda-streams/README.md): how they work, how many real inference uses | Step A done |
+| 01 | [CUDA streams](01-cuda-streams/README.md): how they work, how many real inference uses | Steps A, B done |
 
 Results recorded in the notes were measured on an NVIDIA GB10 (DGX Spark: Blackwell, 48 SMs, unified memory, CUDA 13.0) unless stated otherwise.

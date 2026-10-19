@@ -133,9 +133,81 @@ Priorities don't preempt running blocks. They make the scheduler pick the high-p
    - High-priority streams for latency-critical work.
 4. **Count to collect in Steps B and C:** streams created vs. streams with activity vs. share of GPU time per stream.
 
-## 5. Next
+## 5. Step B: PyTorch generation loop under nsys
 
+Code is in [`pytorch/`](pytorch/):
+- `model.py`: Llama-style decoder, 0.85B params, bf16, random weights, static KV cache.
+- `infer.py`: greedy generation in six styles, annotated with NVTX ranges.
+- `nsys_streams.py`: analyzes an nsys report.
+- `run.sh`: profiles every mode.
+
+Setup is `scripts/setup_venv.sh`. Raw output is in `results/stepB-*.txt`. Every run uses batch 1, a 512-token prompt and 32 decode steps.
+
+| Mode | What it does |
+|---|---|
+| `eager` | Textbook loop: `tok.cpu()` after each step (host sync) |
+| `async` | Token D2H copy on a side stream into pinned memory; host reads step *i*'s token while the GPU runs *i+1* |
+| `async-fixed` | `async` without the hidden per-step sync (see below) |
+| `graph-sync` | Decode step captured into a CUDA graph by hand; synchronous token copy |
+| `graph` | Same graph + async token copy |
+| `compile` | `torch.compile(mode="reduce-overhead")`: Inductor kernels + automatic CUDA graphs |
+
+### "How many streams?" has three answers
+
+| Mode | Streams **created** | Streams that **received work** (whole run) | Streams carrying **GPU time** (measured) |
+|---|---|---|---|
+| eager | 7 (none by PyTorch) | 1 | **1** (100%) |
+| async / async-fixed | 135 | 4 | **1** (100%) + 8-byte copies on 1 side stream |
+| graph / graph-sync | 136 | 5 / 2 | **1** (100%) |
+| compile | 137 | 5 | **1** (100%) + side copy stream |
+
+1. **Created: 7 baseline, +128 the moment you touch `torch.cuda.Stream()`.**
+   - The 7 baseline streams exist before PyTorch creates any. They include the null stream and one stream at priority −5. No runtime create call is traced for them, so they come from the driver or libraries.
+   - Asking for *one* side stream makes PyTorch lazily build its **whole stream pool**: 4 priority levels (0, −1, −2, −3) × 32 streams = 128 `cudaStreamCreateWithPriority` calls. Graph capture and `torch.compile` each take one more stream.
+2. **Received work: 1–5.** The extra active streams in graph/compile modes are only used during warmup and capture. PyTorch requires warming up on a side stream, and capture itself runs on a side stream.
+3. **GPU time: always exactly 1 stream.** In every mode, 100% of kernel time is on one stream, which is **the legacy null stream** (id 7). PyTorch's default "current stream" *is* stream 0. Graph replays are also launched there. The only work on another stream is the 8-byte token D2H copy.
+
+This matches the Step A prediction: a single-GPU decoder is one long dependency chain, so there is nothing for a second compute stream to do.
+
+### Where the time goes: launch overhead, not streams
+
+| Mode | ms/token | kernels/step | Host ms/step | GPU kernel ms/step | GPU busy |
+|---|---|---|---|---|---|
+| eager | 12.62 | 950 | 12.45 | 10.12 | 82% |
+| async | 12.50 | 950 | 12.49 | 10.11 | 82% |
+| async-fixed | 12.47 | 951 | 12.24 | 10.19 | 83% |
+| graph-sync | 11.06* | 951 (950 in graph) | 10.82 | 10.09 | 93% |
+| graph | 10.43 | 951 (950 in graph) | 10.18 | 10.05 | 98% |
+| compile | 10.22 | **269** (266 in graph) | 10.20 | 9.91 | 98% |
+
+\* graph-sync is 10.33 ms/token without nsys. Tracing makes each sync more expensive.
+
+- **Eager is launch-bound.** Issuing 950 kernels takes the CPU ~12.4 ms (~13 µs per op of Python + dispatcher on this ARM CPU). The GPU needs only ~10.1 ms, so the GPU sits idle 18% of the time.
+- **Async copies alone don't help** (eager 12.62 → async-fixed 12.47). The bottleneck is CPU launch throughput, not sync bubbles.
+- **CUDA graphs fix it** (one launch per step, 98% busy). `torch.compile` additionally fuses 950 → 269 kernels.
+- At ~10 ms per step for 1.7 GB of bf16 weights, decode streams weights at ~170 GB/s, about 60% of the GB10's ~273 GB/s. It's memory-bound, as expected for batch 1.
+
+### When the side stream *does* pay off: hiding host work
+
+A real server does CPU work for every token (scheduling, detokenization, stop checks). `--host-work-ms` simulates that work with a busy-wait after each token arrives on the host:
+
+| Host work per token | graph-sync (ms/token) | graph + async copy (ms/token) |
+|---|---|---|
+| 0 ms | 10.33 | 10.40 |
+| 3 ms | 13.17 | **10.24** |
+| 6 ms | 16.24 | **10.40** |
+
+With synchronous copies, time per token = GPU time + host work. With the copy on a side stream (signalled by an event, read one step late), host work overlaps the next step completely, as long as it's shorter than a step. **This is the reason inference engines keep a dedicated output-copy stream** ("async scheduling" / "overlap scheduler").
+
+### Pitfalls found along the way
+
+- **Hidden sync from `torch.tensor(..., device="cuda")`.** It does a *pageable* H2D copy, which blocks the host (Step A, experiment 04). The `async` mode had one in every step. The analyzer's memcpy breakdown (`Pageable->Device`) exposed it. Keep loop state such as positions on the GPU and update it in place.
+- **`torch.compile(mode="reduce-overhead")` can silently skip CUDA graphs.** It prints `skipping cudagraphs due to mutated inputs` when a mutated input (the KV cache) has no fixed address. Fix: `torch._dynamo.mark_static_address(cache)`. Without the fix, the "compile" numbers would have been compile-without-graphs.
+- **SDPA with a sliced bool mask** adds one small D2D copy per layer (to make the mask contiguous). It's harmless here, but it's an example of copies you don't expect.
+- **Environment:** PyTorch crashed on import on this machine. The cause was a `cpuinfo` heap overflow from the container's partial CPU set; see [`tools/cpuinfo-fix`](../tools/cpuinfo-fix/README.md).
+
+## 6. Next
+
+- [ ] Step C: vLLM / SGLang on a small (real) model. Do they also put all compute on one stream? Which side streams do they add (output copy, KV offload, sampling)? What do batch size and prefill/decode mixing change?
 - [ ] Step A follow-up: zero-copy reads of `malloc`/pinned memory from a kernel on GB10, compared with copy-then-compute.
-- [ ] Step A follow-up: view one run in `nsys` to learn how streams look on the timeline.
-- [ ] Step B: PyTorch eager small transformer: number of streams, where `non_blocking=True` copies land.
-- [ ] Step C: vLLM / SGLang on a small model: streams per phase, eager vs. CUDA Graph.
+- [ ] Optional: multi-stream inside one forward pass (e.g. overlapping an independent branch) to see when a second *compute* stream helps.
