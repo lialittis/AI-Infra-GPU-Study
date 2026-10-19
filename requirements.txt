@@ -1,2 +1,3 @@
 # torch itself is installed by scripts/setup_venv.sh from the CUDA-matched index.
 numpy
+ninja  # torch.utils.cpp_extension.load_inline (02-cuda-graph-numerical-errors)

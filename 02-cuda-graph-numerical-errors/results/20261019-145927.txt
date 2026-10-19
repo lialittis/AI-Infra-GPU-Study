@@ -1,0 +1,540 @@
+torch 2.14.1+cu130 | CUDA 13.0 | NVIDIA GB10
+=== control-flow/bug (bug, s1_dynamic) ===
+    i=0, z.item()=2
+    i=1, z.item()=0
+    i=2, z.item()=2
+    i=3, z.item()=0
+    i=4, z.item()=0
+    i=5, z.item()=0
+  -> REPRODUCED: observed [2, 0, 2, 0, 0, 0], expected [2, 0, 2, 0, 2, 0], page shows [2, 0, 2, 0, 0, 0]
+
+=== control-flow/fix-where (fix, s1_dynamic) ===
+    i=0, z.item()=2
+    i=1, z.item()=0
+    i=2, z.item()=2
+    i=3, z.item()=0
+    i=4, z.item()=2
+    i=5, z.item()=0
+  -> CORRECT: observed [2, 0, 2, 0, 2, 0], expected [2, 0, 2, 0, 2, 0], page shows [2, 0, 2, 0, 2, 0]
+
+=== control-flow/fix-kernel (fix, s1_dynamic) ===
+    i=0, z.item()=2
+    i=1, z.item()=0
+    i=2, z.item()=2
+    i=3, z.item()=0
+    i=4, z.item()=2
+    i=5, z.item()=0
+  -> CORRECT: observed [2, 0, 2, 0, 2, 0], expected [2, 0, 2, 0, 2, 0], page shows [2, 0, 2, 0, 2, 0]
+
+=== control-flow/fix-multi-graph (fix, s1_dynamic) ===
+    idx=0, z.item()=2
+    idx=1, z.item()=0
+    idx=2, z.item()=2
+    idx=3, z.item()=0
+    idx=4, z.item()=2
+    idx=5, z.item()=0
+  -> CORRECT: observed [2, 0, 2, 0, 2, 0], expected [2, 0, 2, 0, 2, 0]
+
+=== control-flow/fix-partial (fix, s1_dynamic) ===
+    idx=0, out_static.item()=2
+    idx=1, out_static.item()=0
+    idx=2, out_static.item()=2
+    idx=3, out_static.item()=0
+    idx=4, out_static.item()=2
+    idx=5, out_static.item()=0
+  -> CORRECT: observed [2, 0, 2, 0, 2, 0], expected [2, 0, 2, 0, 2, 0]
+
+=== capture-aware/bug (bug, s1_dynamic) ===
+    i=0, z.item()=0
+    i=1, z.item()=1
+    i=2, z.item()=2
+    i=3, z.item()=-3
+    i=4, z.item()=-4
+    i=5, z.item()=-5
+  -> REPRODUCED: observed [0, 1, 2, -3, -4, -5], expected [0, 1, 2, 3, 4, 5], page shows [0, 1, 2, -3, -4, -5]
+
+=== capture-aware/fix (fix, s1_dynamic) ===
+    i=0, z.item()=0
+    i=1, z.item()=1
+    i=2, z.item()=2
+    i=3, z.item()=3
+    i=4, z.item()=4
+    i=5, z.item()=5
+  -> CORRECT: observed [0, 1, 2, 3, 4, 5], expected [0, 1, 2, 3, 4, 5]
+
+=== capture-aware/fix-sleep (fix, s1_dynamic) ===
+    i=0, z.item()=0
+    i=1, z.item()=1
+    i=2, z.item()=2
+    i=3, z.item()=3
+    i=4, z.item()=4
+    i=5, z.item()=5
+  -> CORRECT: observed [0, 1, 2, 3, 4, 5], expected [0, 1, 2, 3, 4, 5]
+
+=== dynamic-input/bug (bug, s1_dynamic) ===
+    i=0, out.item()=0
+    i=1, out.item()=1
+    i=2, out.item()=1
+    i=3, out.item()=1
+    i=4, out.item()=1
+    i=5, out.item()=1
+  -> REPRODUCED: observed [0, 1, 1, 1, 1, 1], expected [0, 1, 2, 3, 4, 5], page shows [0, 1, 1, 1, 1, 1]
+
+=== dynamic-input/fix (fix, s1_dynamic) ===
+    i=0, out.item()=0
+    i=1, out.item()=1
+    i=2, out.item()=2
+    i=3, out.item()=3
+    i=4, out.item()=4
+    i=5, out.item()=5
+  -> CORRECT: observed [0, 1, 2, 3, 4, 5], expected [0, 1, 2, 3, 4, 5]
+
+=== autocast-cache/bug (bug, s1_dynamic) ===
+    w.item()=1.0, y.item()=1.0
+    w.item()=2.0, y.item()=1.0
+  -> REPRODUCED: observed [1.0, 1.0], expected [1.0, 2.0], page shows [1.0, 1.0]
+
+=== autocast-cache/fix-no-cache (fix, s1_dynamic) ===
+    w.item()=1.0, y.item()=1.0
+    w.item()=2.0, y.item()=2.0
+  -> CORRECT: observed [1.0, 2.0], expected [1.0, 2.0]
+
+=== autocast-cache/fix-inside (fix, s1_dynamic) ===
+    w.item()=1.0, y.item()=1.0
+    w.item()=2.0, y.item()=2.0
+  -> CORRECT: observed [1.0, 2.0], expected [1.0, 2.0]
+
+=== dynamic-scalar/bug (bug, s1_dynamic) ===
+    i=0, z.item()=1.0
+    i=1, z.item()=2.0
+    i=2, z.item()=4.0
+    i=3, z.item()=8.0
+    i=4, z.item()=8.0
+    i=5, z.item()=8.0
+  -> REPRODUCED: observed [1.0, 2.0, 4.0, 8.0, 8.0, 8.0], expected [1.0, 2.0, 4.0, 8.0, 16.0, 32.0], page shows [1.0, 2.0, 4.0, 8.0, 8.0, 8.0]
+
+=== dynamic-scalar/fix (fix, s1_dynamic) ===
+    i=0, z.item()=1.0
+    i=1, z.item()=2.0
+    i=2, z.item()=4.0
+    i=3, z.item()=8.0
+    i=4, z.item()=16.0
+    i=5, z.item()=32.0
+  -> CORRECT: observed [1.0, 2.0, 4.0, 8.0, 16.0, 32.0], expected [1.0, 2.0, 4.0, 8.0, 16.0, 32.0]
+
+=== hidden-scalar/lr-bug (bug, s1_dynamic) ===
+    step=0, lr=1.0, w.item()=-1.0
+    step=1, lr=0.5, w.item()=-2.0
+    step=2, lr=0.25, w.item()=-3.0
+    step=3, lr=0.125, w.item()=-4.0
+  -> REPRODUCED: observed [-1.0, -2.0, -3.0, -4.0], expected [-1.0, -1.5, -1.75, -1.875]
+
+=== hidden-scalar/lr-fix (fix, s1_dynamic) ===
+    step=0, lr=1.0, w.item()=-1.0
+    step=1, lr=0.5, w.item()=-1.5
+    step=2, lr=0.25, w.item()=-1.75
+    step=3, lr=0.125, w.item()=-1.875
+  -> CORRECT: observed [-1.0, -1.5, -1.75, -1.875], expected [-1.0, -1.5, -1.75, -1.875]
+
+=== hidden-scalar/step-counter-bug (bug, s1_dynamic) ===
+    i=0, z.item()=0.0
+    i=1, z.item()=1.0
+    i=2, z.item()=2.0
+    i=3, z.item()=3.0
+    i=4, z.item()=3.0
+    i=5, z.item()=3.0
+  -> REPRODUCED: observed [0.0, 1.0, 2.0, 3.0, 3.0, 3.0], expected [0.0, 1.0, 2.0, 3.0, 4.0, 5.0]
+
+=== hidden-scalar/step-counter-fix (fix, s1_dynamic) ===
+    i=0, z.item()=0.0
+    i=1, z.item()=1.0
+    i=2, z.item()=2.0
+    i=3, z.item()=3.0
+    i=4, z.item()=4.0
+    i=5, z.item()=5.0
+  -> CORRECT: observed [0.0, 1.0, 2.0, 3.0, 4.0, 5.0], expected [0.0, 1.0, 2.0, 3.0, 4.0, 5.0]
+
+=== hidden-scalar/grad-scaler-bug (bug, s1_dynamic) ===
+  -> ERROR: AcceleratorError: CUDA error: operation failed due to a previous error during capture
+
+=== hidden-scalar/grad-scaler-fix (fix, s1_dynamic) ===
+    scale=32.0, weight[0]=-0.073987
+    scale=64.0, weight[0]=-0.038217
+    scale=128.0, weight[0]=-0.050021
+    scale=256.0, weight[0]=-0.125983
+    scale=512.0, weight[0]=-0.091243
+  -> CORRECT: observed [-0.09124314785003662, 0.10395936667919159, -0.15157292783260345, 0.1564461588859558, 0.08388537913560867, 0.11119318753480911, -0.0703195184469223, 0.07379447668790817, 0.00395723432302475, 512.0], expected [-0.09124314785003662, 0.10395936667919159, -0.15157292783260345, 0.1564461588859558, 0.08388537913560867, 0.11119318753480911, -0.0703195184469223, 0.07379447668790817, 0.00395723432302475, 512.0]
+
+=== rng/default-auto (fix, s1_dynamic) ===
+    replay 0: first values [0.0, 0.0, 2.0, 2.0]
+    replay 1: first values [2.0, 0.0, 0.0, 2.0]
+    replay 2: first values [2.0, 0.0, 0.0, 2.0]
+    replay 3: first values [0.0, 0.0, 0.0, 2.0]
+    replay 4: first values [2.0, 2.0, 2.0, 2.0]
+  -> CORRECT: observed 5, expected 5
+
+=== rng/default-registered (fix, s1_dynamic) ===
+    replay 0: first values [2.0, 2.0, 2.0, 2.0]
+    replay 1: first values [2.0, 0.0, 2.0, 2.0]
+    replay 2: first values [0.0, 0.0, 0.0, 2.0]
+    replay 3: first values [0.0, 2.0, 0.0, 0.0]
+    replay 4: first values [0.0, 2.0, 2.0, 2.0]
+  -> CORRECT: observed 5, expected 5
+
+=== rng/custom-unregistered (bug, s1_dynamic) ===
+    replay 0: first values [0.9722, 0.791, 0.469, 0.33]
+    replay 1: first values [0.0194, 0.7733, 0.865, 0.8097]
+    replay 2: first values [0.7874, 0.1344, 0.219, 0.8193]
+    replay 3: first values [0.9345, 0.8207, 0.0164, 0.1889]
+    replay 4: first values [0.4503, 0.8435, 0.9122, 0.1999]
+  -> NOT REPRODUCED: observed 5, expected 5
+
+=== rng/custom-registered (fix, s1_dynamic) ===
+    replay 0: first values [0.9722, 0.791, 0.469, 0.33]
+    replay 1: first values [0.0194, 0.7733, 0.865, 0.8097]
+    replay 2: first values [0.7874, 0.1344, 0.219, 0.8193]
+    replay 3: first values [0.9345, 0.8207, 0.0164, 0.1889]
+    replay 4: first values [0.4503, 0.8435, 0.9122, 0.1999]
+  -> CORRECT: observed 5, expected 5
+
+=== dynamic-shape/bug (bug, s1_dynamic) ===
+    same shape: y.tolist()=[6, 6, 6, 6]
+    larger input: y.tolist()=[10, 10, 10, 10]
+  -> REPRODUCED: observed [10, 10, 10, 10], expected [10, 10, 10, 10, 10, 10, 10, 10], page shows [10, 10, 10, 10]
+
+=== dynamic-shape/fix-pad (fix, s1_dynamic) ===
+    size 3: [0.0, 2.0, 4.0]
+    size 8: [2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0]
+    size 5: [4.0, 6.0, 8.0, 10.0, 12.0]
+  -> CORRECT: observed [[0.0, 2.0, 4.0], [2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0], [4.0, 6.0, 8.0, 10.0, 12.0]], expected [[0.0, 2.0, 4.0], [2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0], [4.0, 6.0, 8.0, 10.0, 12.0]]
+
+=== dynamic-shape/fix-bucket (fix, s1_dynamic) ===
+    size 3 -> bucket 4
+    size 8 -> bucket 8
+    size 5 -> bucket 8
+  -> CORRECT: observed [[0.0, 2.0, 4.0], [2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0], [4.0, 6.0, 8.0, 10.0, 12.0]], expected [[0.0, 2.0, 4.0], [2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0], [4.0, 6.0, 8.0, 10.0, 12.0]]
+
+=== pinned/bug-eager (bug, s2_race) ===
+    i=0, expect 0, got 0.0
+    i=1, expect 1, got 9.0
+    i=2, expect 4, got 9.0
+    i=3, expect 9, got 9.0
+  -> REPRODUCED: observed [0.0, 9.0, 9.0, 9.0], expected [0.0, 1.0, 4.0, 9.0], page shows [0.0, 9.0, 9.0, 9.0]
+
+=== pinned/bug-graph (bug, s2_race) ===
+    i=0, expect 0, got 9.0
+    i=1, expect 1, got 9.0
+    i=2, expect 4, got 9.0
+    i=3, expect 9, got 9.0
+  -> REPRODUCED: observed [9.0, 9.0, 9.0, 9.0], expected [0.0, 1.0, 4.0, 9.0], page shows [9.0, 9.0, 9.0, 9.0]
+
+=== pinned/fix-synchronize (fix, s2_race) ===
+    i=0, expect 0, got 0.0
+    i=1, expect 1, got 1.0
+    i=2, expect 4, got 4.0
+    i=3, expect 9, got 9.0
+  -> CORRECT: observed [0.0, 1.0, 4.0, 9.0], expected [0.0, 1.0, 4.0, 9.0]
+
+=== pinned/fix-event (fix, s2_race) ===
+    i=0, expect 0, got 0.0
+    i=1, expect 1, got 1.0
+    i=2, expect 4, got 4.0
+    i=3, expect 9, got 9.0
+  -> CORRECT: observed [0.0, 1.0, 4.0, 9.0], expected [0.0, 1.0, 4.0, 9.0]
+
+=== pinned/fix-cuda-input (fix, s2_race) ===
+    i=0, expect 0, got 0.0
+    i=1, expect 1, got 1.0
+    i=2, expect 4, got 4.0
+    i=3, expect 9, got 9.0
+  -> CORRECT: observed [0.0, 1.0, 4.0, 9.0], expected [0.0, 1.0, 4.0, 9.0]
+
+=== freed-cuda-input/bug (bug, s3_deconstructed) ===
+    freed static_input was at 0x32ee00000, other_tensor is at 0x32ee00000
+    output.tolist()=[-4.692322731018066, 0.0947311520576477, 2.682900905609131, -0.6190624237060547]
+  -> REPRODUCED: observed [-4.692322731018066, 0.0947311520576477, 2.682900905609131, -0.6190624237060547], expected [2.0, 2.0, 2.0, 2.0]
+
+=== freed-cuda-input/fix (fix, s3_deconstructed) ===
+    static_input at 0x32ee00000, other_tensor at 0x32ee00200
+    output.tolist()=[6.0, 6.0, 6.0, 6.0]
+  -> CORRECT: observed [6.0, 6.0, 6.0, 6.0], expected [6.0, 6.0, 6.0, 6.0], page shows [6.0, 6.0, 6.0, 6.0]
+
+=== freed-cpu-input/bug (bug, s3_deconstructed) ===
+    i=0, z.item()=0
+    i=1, z.item()=1
+    i=2, z.item()=2
+  -> ERROR: RuntimeError: Cannot copy between CPU and CUDA tensors during CUDA graph capture unless the CPU tensor is pinned. Please use tensor.pin_memory() or allocate the tensor with pin_memory=True.
+
+=== freed-cpu-input/fix-keep-alive (fix, s3_deconstructed) ===
+    i=0, z.item()=0
+    i=1, z.item()=1
+    i=2, z.item()=2
+  -> ERROR: RuntimeError: Cannot copy between CPU and CUDA tensors during CUDA graph capture unless the CPU tensor is pinned. Please use tensor.pin_memory() or allocate the tensor with pin_memory=True.
+
+=== freed-cpu-input/fix-gpu-tensor (fix, s3_deconstructed) ===
+    i=0, z.item()=0
+    i=1, z.item()=1
+    i=2, z.item()=2
+  -> ERROR: RuntimeError: Cannot copy between CPU and CUDA tensors during CUDA graph capture unless the CPU tensor is pinned. Please use tensor.pin_memory() or allocate the tensor with pin_memory=True.
+
+=== freed-cpu-input/bug-pinned (bug, s3_deconstructed) ===
+    i=0, z.item()=0
+    i=1, z.item()=1
+    i=2, z.item()=2
+    captured H2D copy reads host address 0x32ee00000
+    i=3, z.item()=3
+    new pinned tensor at 0x32ee00200
+    i=4, z.item()=3
+    new pinned tensor at 0x32ee00200
+    i=5, z.item()=3
+  -> NOT REPRODUCED: observed [0, 1, 2, 3, 3, 3], expected [0, 1, 2, 3, 3, 3]
+
+=== freed-cpu-input/fix-pinned-keep-alive (fix, s3_deconstructed) ===
+    i=0, z.item()=0
+    i=1, z.item()=1
+    i=2, z.item()=2
+    i=3, z.item()=3
+    new pinned tensor at 0x32ee00800
+    i=4, z.item()=3
+    new pinned tensor at 0x32ee00800
+    i=5, z.item()=3
+  -> CORRECT: observed [0, 1, 2, 3, 3, 3], expected [0, 1, 2, 3, 3, 3]
+
+=== freed-cpu-input/fix-full (fix, s3_deconstructed) ===
+    i=0, z.item()=0
+    i=1, z.item()=1
+    i=2, z.item()=2
+    i=3, z.item()=3
+    i=4, z.item()=3
+    i=5, z.item()=3
+  -> CORRECT: observed [0, 1, 2, 3, 3, 3], expected [0, 1, 2, 3, 3, 3]
+
+=== output-reuse/bug (bug, s4_outputs_state) ===
+    ys[0].item()=5.0, ys[-1].item()=5.0, out.item()=15.0
+  -> REPRODUCED: observed [5.0, 5.0, 15.0], expected [1.0, 5.0, 8.0], page shows [5.0, 5.0, 15.0]
+
+=== output-reuse/fix (fix, s4_outputs_state) ===
+    ys[0].item()=1.0, ys[-1].item()=5.0, out.item()=8.0
+  -> CORRECT: observed [1.0, 5.0, 8.0], expected [1.0, 5.0, 8.0], page shows [1.0, 5.0, 8.0]
+
+=== host-state/bug (bug, s4_outputs_state) ===
+    i=0, state=1, y.item()=1
+    i=1, state=2, y.item()=-1
+    i=2, state=3, y.item()=1
+    i=3, state=4, y.item()=-1
+    i=4, state=4, y.item()=-1
+    i=5, state=4, y.item()=-1
+  -> REPRODUCED: observed [1, -1, 1, -1, -1, -1], expected [1, -1, 1, -1, 1, -1], page shows [1, -1, 1, -1, -1, -1]
+
+=== host-state/fix-outside (fix, s4_outputs_state) ===
+    i=0, state=[1], y.item()=1
+    i=1, state=[2], y.item()=-1
+    i=2, state=[3], y.item()=1
+    i=3, state=[4], y.item()=-1
+    i=4, state=[5], y.item()=1
+    i=5, state=[6], y.item()=-1
+  -> CORRECT: observed [1, -1, 1, -1, 1, -1], expected [1, -1, 1, -1, 1, -1]
+
+=== host-state/fix-gpu-tensor (fix, s4_outputs_state) ===
+    i=0, state=1, y.item()=1
+    i=1, state=2, y.item()=-1
+    i=2, state=3, y.item()=1
+    i=3, state=4, y.item()=-1
+    i=4, state=5, y.item()=1
+    i=5, state=6, y.item()=-1
+  -> CORRECT: observed [1, -1, 1, -1, 1, -1], expected [1, -1, 1, -1, 1, -1]
+
+=== library-stream/bug (bug, s5_missing_ops) ===
+    warmup i=0, y.item()=2
+    warmup i=1, y.item()=4
+    warmup i=2, y.item()=6
+    replay i=4, y.item()=0
+    replay i=5, y.item()=0
+    replay i=6, y.item()=0
+  -> REPRODUCED: observed [2, 4, 6, 0, 0, 0], expected [2, 4, 6, 10, 12, 14], page shows [2, 4, 6, 0, 0, 0]
+
+=== library-stream/fix-current-stream (fix, s5_missing_ops) ===
+    warmup i=0, y.item()=2
+    warmup i=1, y.item()=4
+    warmup i=2, y.item()=6
+    replay i=4, y.item()=10
+    replay i=5, y.item()=12
+    replay i=6, y.item()=14
+  -> CORRECT: observed [2, 4, 6, 10, 12, 14], expected [2, 4, 6, 10, 12, 14]
+
+=== library-stream/fix-pass-stream (fix, s5_missing_ops) ===
+    warmup i=0, y.item()=2
+    warmup i=1, y.item()=4
+    warmup i=2, y.item()=6
+    replay i=4, y.item()=10
+    replay i=5, y.item()=12
+    replay i=6, y.item()=14
+  -> CORRECT: observed [2, 4, 6, 10, 12, 14], expected [2, 4, 6, 10, 12, 14]
+
+=== library-stream/fix-internal-stream (fix, s5_missing_ops) ===
+    warmup i=0, y.item()=2
+    warmup i=1, y.item()=4
+    warmup i=2, y.item()=6
+    replay i=4, y.item()=10
+    replay i=5, y.item()=12
+    replay i=6, y.item()=14
+  -> CORRECT: observed [2, 4, 6, 10, 12, 14], expected [2, 4, 6, 10, 12, 14]
+
+=== module-hooks/bug (bug, s5_missing_ops) ===
+    Registered: 4, Called: 1
+  -> REPRODUCED: observed 1, expected 4, page shows 1
+
+=== module-hooks/workaround-top-level (fix, s5_missing_ops) ===
+    top-level hook saw 5 parameters: ['0.weight', '1.weight', '1.bias', '2.weight', '2.bias']
+  -> CORRECT: observed 5, expected 5
+
+=== shared-pool/bug (bug, s6_memory_pool) ===
+    Correct: y1.item()=8.0, y2.item()=4.0
+    x1.data_ptr()=0x32ee00000, t1.data_ptr()=0x327e00000, y1.data_ptr()=0x327e00200
+    x2.data_ptr()=0x32ee00200, y2.data_ptr()=0x327e00000
+    Actual: y1.item()=8.0, y2.item()=3.0
+  -> REPRODUCED: observed [8.0, 3.0], expected [8.0, 4.0], page shows [8.0, 3.0]
+
+=== shared-pool/fix-read-immediately (fix, s6_memory_pool) ===
+    Correct: y1.item()=8.0, y2.item()=4.0
+    x1.data_ptr()=0x32ee00000, t1.data_ptr()=0x327e00000, y1.data_ptr()=0x327e00200
+    x2.data_ptr()=0x32ee00200, y2.data_ptr()=0x327e00000
+    result1.item()=8.0, result2.item()=4.0
+  -> CORRECT: observed [8.0, 4.0], expected [8.0, 4.0]
+
+=== shared-pool/fix-separate-pools (fix, s6_memory_pool) ===
+    Correct: y1.item()=8.0, y2.item()=4.0
+    x1.data_ptr()=0x32ee00000, t1.data_ptr()=0x327e00000, y1.data_ptr()=0x327e00200
+    x2.data_ptr()=0x32ee00200, y2.data_ptr()=0x32c000000
+    y1.item()=8.0, y2.item()=4.0
+  -> CORRECT: observed [8.0, 4.0], expected [8.0, 4.0]
+
+=== shared-pool/fix-capture-order (fix, s6_memory_pool) ===
+    Correct: y1.item()=8.0, y2.item()=4.0
+    x1.data_ptr()=0x32ee00000, t1.data_ptr()=0x327e00000, y1.data_ptr()=0x327e00200
+    x2.data_ptr()=0x32ee00200, y2.data_ptr()=0x327e00000
+    y1.item()=8.0, y2.item()=4.0
+  -> CORRECT: observed [8.0, 4.0], expected [8.0, 4.0]
+
+=== replay-order/bug (bug, s6_memory_pool) ===
+    Actual grad: [6.0, 3.0, 8.0], correct grad: [4.0, 6.0, 8.0]
+  -> REPRODUCED: observed [6.0, 3.0, 8.0], expected [4.0, 6.0, 8.0], page shows [6.0, 3.0, 8.0]
+
+=== replay-order/fix-capture-order (fix, s6_memory_pool) ===
+    Actual grad: [6.0, 3.0, 8.0], correct grad: [4.0, 6.0, 8.0]
+  -> WRONG: observed [6.0, 3.0, 8.0], expected [4.0, 6.0, 8.0]
+
+=== replay-order/fix-documented-order (fix, s6_memory_pool) ===
+    Actual grad: [4.0, 6.0, 8.0], correct grad: [4.0, 6.0, 8.0]
+  -> CORRECT: observed [4.0, 6.0, 8.0], expected [4.0, 6.0, 8.0]
+
+=== replay-order/fix-separate-pools (fix, s6_memory_pool) ===
+    Actual grad: [4.0, 6.0, 8.0], correct grad: [4.0, 6.0, 8.0]
+  -> CORRECT: observed [4.0, 6.0, 8.0], expected [4.0, 6.0, 8.0]
+
+=== replay-order/fix-capture-in-replay-order (fix, s6_memory_pool) ===
+    Actual grad: [4.0, 6.0, 8.0], correct grad: [4.0, 6.0, 8.0]
+  -> CORRECT: observed [4.0, 6.0, 8.0], expected [4.0, 6.0, 8.0]
+
+=== parallel-replay/bug (bug, s6_memory_pool) ===
+    Correct: [4.0, 10.0, 18.0]
+    Actual: [4.0, 7.0, 11.0]
+    wrong elements per output (of 268435456): [0, 268435456, 268435456]
+  -> REPRODUCED: observed [0, 268435456, 268435456], expected [0, 0, 0]
+
+=== parallel-replay/fix-separate-pools (fix, s6_memory_pool) ===
+    Correct: [4.0, 10.0, 18.0]
+    Actual: [4.0, 10.0, 18.0]
+    wrong elements per output (of 268435456): [0, 0, 0]
+  -> CORRECT: observed [0, 0, 0], expected [0, 0, 0]
+
+=== parallel-replay/fix-serialize (fix, s6_memory_pool) ===
+    Correct: [4.0, 10.0, 18.0]
+    Actual: [4.0, 10.0, 18.0]
+    wrong elements per output (of 268435456): [0, 0, 0]
+  -> CORRECT: observed [0, 0, 0], expected [0, 0, 0]
+
+=== layer-diff/bug (bug, s7_debugging) ===
+    Layer 0: max diff = 0.00e+00
+    Layer 1: max diff = 0.00e+00
+    Layer 2: max diff = 2.31e-04
+    Issue first appears at layer 2
+  -> REPRODUCED: observed 2, expected None
+
+=== layer-diff/clean (fix, s7_debugging) ===
+    Layer 0: max diff = 0.00e+00
+    Layer 1: max diff = 0.00e+00
+    Layer 2: max diff = 0.00e+00
+    Layer 3: max diff = 0.00e+00
+    no divergence
+  -> CORRECT: observed None, expected None
+
+case                                      kind  verdict         vs page  time
+control-flow/bug                          bug   REPRODUCED      same      1.4s
+control-flow/fix-where                    fix   CORRECT         same      1.4s
+control-flow/fix-kernel                   fix   CORRECT         same      1.4s
+control-flow/fix-multi-graph              fix   CORRECT         -         1.3s
+control-flow/fix-partial                  fix   CORRECT         -         1.4s
+capture-aware/bug                         bug   REPRODUCED      same      1.4s
+capture-aware/fix                         fix   CORRECT         -         1.3s
+capture-aware/fix-sleep                   fix   CORRECT         -         1.5s
+dynamic-input/bug                         bug   REPRODUCED      same      1.4s
+dynamic-input/fix                         fix   CORRECT         -         1.4s
+autocast-cache/bug                        bug   REPRODUCED      same      1.6s
+autocast-cache/fix-no-cache               fix   CORRECT         -         1.6s
+autocast-cache/fix-inside                 fix   CORRECT         -         1.7s
+dynamic-scalar/bug                        bug   REPRODUCED      same      1.5s
+dynamic-scalar/fix                        fix   CORRECT         -         1.4s
+hidden-scalar/lr-bug                      bug   REPRODUCED      -         1.5s
+hidden-scalar/lr-fix                      fix   CORRECT         -         1.5s
+hidden-scalar/step-counter-bug            bug   REPRODUCED      -         1.4s
+hidden-scalar/step-counter-fix            fix   CORRECT         -         1.3s
+hidden-scalar/grad-scaler-bug             bug   ERROR           -         2.4s
+hidden-scalar/grad-scaler-fix             fix   CORRECT         -         2.3s
+rng/default-auto                          fix   CORRECT         -         1.4s
+rng/default-registered                    fix   CORRECT         -         1.4s
+rng/custom-unregistered                   bug   NOT REPRODUCED  -         1.4s
+rng/custom-registered                     fix   CORRECT         -         1.4s
+dynamic-shape/bug                         bug   REPRODUCED      same      1.3s
+dynamic-shape/fix-pad                     fix   CORRECT         -         1.4s
+dynamic-shape/fix-bucket                  fix   CORRECT         -         1.3s
+pinned/bug-eager                          bug   REPRODUCED      same      1.7s
+pinned/bug-graph                          bug   REPRODUCED      same      1.7s
+pinned/fix-synchronize                    fix   CORRECT         -         1.6s
+pinned/fix-event                          fix   CORRECT         -         1.7s
+pinned/fix-cuda-input                     fix   CORRECT         -         1.5s
+freed-cuda-input/bug                      bug   REPRODUCED      -         1.4s
+freed-cuda-input/fix                      fix   CORRECT         same      1.4s
+freed-cpu-input/bug                       bug   ERROR           -         1.4s
+freed-cpu-input/fix-keep-alive            fix   ERROR           -         1.3s
+freed-cpu-input/fix-gpu-tensor            fix   ERROR           -         1.4s
+freed-cpu-input/bug-pinned                bug   NOT REPRODUCED  -         1.4s
+freed-cpu-input/fix-pinned-keep-alive     fix   CORRECT         -         1.4s
+freed-cpu-input/fix-full                  fix   CORRECT         -         1.3s
+output-reuse/bug                          bug   REPRODUCED      same      1.5s
+output-reuse/fix                          fix   CORRECT         same      1.4s
+host-state/bug                            bug   REPRODUCED      same      1.5s
+host-state/fix-outside                    fix   CORRECT         -         1.3s
+host-state/fix-gpu-tensor                 fix   CORRECT         -         1.4s
+library-stream/bug                        bug   REPRODUCED      same      1.5s
+library-stream/fix-current-stream         fix   CORRECT         -         1.4s
+library-stream/fix-pass-stream            fix   CORRECT         -         1.4s
+library-stream/fix-internal-stream        fix   CORRECT         -         1.3s
+module-hooks/bug                          bug   REPRODUCED      same      1.8s
+module-hooks/workaround-top-level         fix   CORRECT         -         1.9s
+shared-pool/bug                           bug   REPRODUCED      same      1.3s
+shared-pool/fix-read-immediately          fix   CORRECT         -         1.5s
+shared-pool/fix-separate-pools            fix   CORRECT         -         1.5s
+shared-pool/fix-capture-order             fix   CORRECT         -         1.4s
+replay-order/bug                          bug   REPRODUCED      same      1.5s
+replay-order/fix-capture-order            fix   WRONG           -         1.6s
+replay-order/fix-documented-order         fix   CORRECT         -         1.7s
+replay-order/fix-separate-pools           fix   CORRECT         -         1.7s
+replay-order/fix-capture-in-replay-order  fix   CORRECT         -         1.6s
+parallel-replay/bug                       bug   REPRODUCED      -        14.8s
+parallel-replay/fix-separate-pools        fix   CORRECT         -        15.2s
+parallel-replay/fix-serialize             fix   CORRECT         -        14.8s
+layer-diff/bug                            bug   REPRODUCED      -         2.3s
+layer-diff/clean                          fix   CORRECT         -         2.2s
+
+66 cases, 59 as the page describes, 7 different: hidden-scalar/grad-scaler-bug, rng/custom-unregistered, freed-cpu-input/bug, freed-cpu-input/fix-keep-alive, freed-cpu-input/fix-gpu-tensor, freed-cpu-input/bug-pinned, replay-order/fix-capture-order
