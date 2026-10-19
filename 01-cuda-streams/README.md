@@ -4,8 +4,35 @@
 
 Plan:
 - **Step A** (this directory): CUDA C microbenchmarks to understand the mechanism.
-- **Step B**: PyTorch eager under `nsys`.
-- **Step C**: a real serving engine (vLLM / SGLang) under `nsys --cuda-graph-trace=node`.
+- **Step B** ([`pytorch/`](pytorch/)): a PyTorch generation loop under `nsys`.
+- **Step C** ([`vllm/`](vllm/)): vLLM serving a real model under `nsys`.
+
+## Summary
+
+Measured on a single GB10. Details and numbers are in sections 3, 5 and 6.
+
+**How streams work (Step A):**
+- A stream is an in-order queue. Streams give the GPU *permission* to overlap work; free SMs decide whether it actually does (concurrency ≈ min(#streams, capacity / blocks per kernel)).
+- Hidden serializers:
+  - more streams than `CUDA_DEVICE_MAX_CONNECTIONS` hardware queues (default 8), combined with depth-first issue order
+  - the legacy default stream (stream 0), which acts as a global barrier for blocking streams
+  - pageable `cudaMemcpyAsync`, which blocks the host
+- Priorities act at thread-block boundaries; running blocks are never preempted.
+- GB10 has only one copy engine, so H2D and D2H copies can't overlap.
+
+**How many streams real inference uses (Steps B and C):**
+
+| Count | PyTorch loop | vLLM |
+|---|---|---|
+| Streams created | 7 → 135 (the first `torch.cuda.Stream()` builds PyTorch's 128-stream pool) | 135 eager, **3130** with graphs (+1 per instantiated CUDA graph) |
+| Streams that received any work | 1–5 (extras only during warmup / graph capture) | 2–5 |
+| Streams carrying compute | **1**: the legacy null stream | **1**: the legacy null stream |
+
+- **One stream for all compute, plus one for output copies** (D2H of sampled tokens). On a single GPU, the forward pass is one dependency chain, so a second compute stream has nothing to run.
+- **Performance comes from two other mechanisms:**
+  - **CUDA graphs** remove CPU launch overhead. Step B's eager loop was launch-bound (~13 µs × 950 kernels per step on this CPU).
+  - **Async scheduling** overlaps per-token CPU work with GPU work through that one copy stream. In vLLM, async scheduling is worth 13–15% and graphs about 5%.
+- Multiple *compute* streams appear only for multi-GPU communication, micro-batch overlap, KV offload and speculative decoding. None of these was exercised here.
 
 ## 1. Mental model
 
@@ -138,7 +165,7 @@ Priorities don't preempt running blocks. They make the scheduler pick the high-p
 Code is in [`pytorch/`](pytorch/):
 - `model.py`: Llama-style decoder, 0.85B params, bf16, random weights, static KV cache.
 - `infer.py`: greedy generation in six styles, annotated with NVTX ranges.
-- `nsys_streams.py`: analyzes an nsys report.
+- `../nsys_streams.py`: analyzes an nsys report (shared with Step C).
 - `run.sh`: profiles every mode.
 
 Setup is `scripts/setup_venv.sh`. Raw output is in `results/stepB-*.txt`. Every run uses batch 1, a 512-token prompt and 32 decode steps.
@@ -206,8 +233,93 @@ With synchronous copies, time per token = GPU time + host work. With the copy on
 - **SDPA with a sliced bool mask** adds one small D2D copy per layer (to make the mask contiguous). It's harmless here, but it's an example of copies you don't expect.
 - **Environment:** PyTorch crashed on import on this machine. The cause was a `cpuinfo` heap overflow from the container's partial CPU set; see [`tools/cpuinfo-fix`](../tools/cpuinfo-fix/README.md).
 
-## 6. Next
+## 6. Step C: vLLM on a real model
 
-- [ ] Step C: vLLM / SGLang on a small (real) model. Do they also put all compute on one stream? Which side streams do they add (output copy, KV offload, sampling)? What do batch size and prefill/decode mixing change?
+Code is in [`vllm/`](vllm/):
+- `bench.py`: offline `LLM.generate` with fixed-shape workloads, each inside an NVTX `measured:<name>` range.
+- `run.sh`: profiles each config with nsys.
+
+Setup is `scripts/setup_vllm_venv.sh`, which creates a separate venv because vLLM pins its own torch. Raw output is in `results/stepC-*.txt`.
+
+Setup details:
+- **Software:** vLLM 0.32.0 (Model Runner V2, V1 engine), torch 2.13.0+cu130.
+- **Model:** **Qwen2.5-1.5B-Instruct**, bf16, run with `gpu_memory_utilization=0.3`. This is a shared machine, and on unified memory that fraction is of system RAM.
+- **Inputs:** prompts are random token IDs, EOS is ignored, and prefix caching is off, so every run has identical shapes.
+
+**Does vLLM support GB10 (sm_121)?** This was checked before installing, by inspecting the aarch64 wheel with `cuobjdump`:
+
+| vLLM library | GPU code in the wheel | On GB10 |
+|---|---|---|
+| `_C_stable_libtorch`, `_moe_C_stable_libtorch` (core / MoE kernels) | sm_80 … sm_120 binaries + PTX | ✅ sm_120 binaries run on sm_121 (same major version) |
+| `vllm_flash_attn/_vllm_fa2_C` | sm_80 binary + sm_80 PTX | ✅ via driver PTX JIT (selected backend: `FLASH_ATTN`, FA2) |
+| `vllm_flash_attn/_vllm_fa3_C` | sm_90a | ❌ |
+| FlashMLA, DeepSelect, QuTLASS, DeepGEMM | sm_90a / sm_100 | ❌ only needed for MLA (DeepSeek-style) / FP4 models |
+
+The aarch64 wheel pins torch 2.13.0, whose PyPI aarch64 build is CUDA 13.0, matching the 580 driver. It goes in its own venv so it doesn't clash with Step B's torch 2.14.1. Engine startup takes about 2 minutes: model load, `torch.compile` (~7 s, cached afterwards), and two rounds of CUDA graph capture (~40 s each).
+
+| Config | Meaning |
+|---|---|
+| `default` | vLLM defaults: `torch.compile` + CUDA graphs (full graphs for decode, piecewise for mixed batches) + async scheduling |
+| `no-async` | `async_scheduling=False`: the engine waits for each step's output before scheduling the next |
+| `eager` | `enforce_eager=True`: no compile, no graphs (async scheduling still on) |
+
+| Workload | Requests × prompt → output |
+|---|---|
+| `decode-b1` | 1 × 512 → 128 |
+| `decode-b32` | 32 × 512 → 128 |
+| `prefill-b32` | 32 × 1024 → 1 |
+
+### Stream counts
+
+| | default / no-async | eager |
+|---|---|---|
+| Streams **created** (`EngineCore` process) | **3130** | 135 |
+| … of which: PyTorch's pool (128 traced `cudaStreamCreateWithPriority` calls) | 128 | 128 |
+| … of which: driver-internal, **one per instantiated CUDA graph** (2995 `cudaGraphInstantiate` calls) | 2995 | 0 |
+| Streams that **received work** (whole run) | 5 | 2 |
+| Streams carrying **GPU time** (every workload) | **1** (100%) | **1** (100%) |
+
+- **All compute runs on the legacy null stream (id 7), for every config and workload,** including batch 32 and the 32k-token prefill. Graph replays are launched there too. vLLM, like our Step B harness, uses PyTorch's default stream.
+- **The only other stream doing work during inference is stream 13, vLLM's `output_copy_stream`.** It carries the D2H copies of sampled token IDs and their counts: 8 B + 4 B per step at batch 1, and 256 B + 128 B at batch 32 (32 × int64 and 32 × int32). In Model Runner V2 this stream is created unconditionally, so it's used even with `async_scheduling=False`.
+- **The 3 extra active streams in graph configs** are only used during warmup and graph capture.
+- **Why ~3000 streams are "created":** vLLM captures 2995 CUDA graphs (piecewise pieces × capture batch sizes, plus full decode graphs). Each instantiated graph shows up as one extra context stream in nsys, with no create call traced; the count matches exactly: 3033 − 38 baseline = 2995. These streams never receive work we can see. "Number of streams created" is therefore a meaningless metric for graph-heavy programs.
+- **No compute side stream exists in the code path.** Reading the V2 runner's source (`vllm/v1/worker/gpu/`), the only other streams are for structured-output copies, speculative decoding copies, and the comm/capture streams for micro-batch overlap (DBO, multi-GPU). None is active in this setup.
+
+### Performance by config
+
+| Workload | Metric | default | no-async | eager |
+|---|---|---|---|---|
+| decode-b1 | ms / step (wall) | **16.24** | 18.74 | 17.08 |
+| | GPU busy | 99% | 87% | 95% |
+| | kernels / step (in graph) | 321 (307) | 323 (308) | 323 (0) |
+| decode-b32 | ms / step (wall) | **22.17** | 25.10 | 23.07 |
+| | GPU busy | 98% | 87% | 96% |
+| prefill-b32 | prompt tok/s | 23.6k | 23.5k | 23.4k |
+| | kernels in graph | 0 | 0 | 0 |
+
+- **Async scheduling matters more than CUDA graphs here.** Turning it off costs 15% at batch 1 and 13% at batch 32: the GPU idles 13% while the CPU schedules the next step. That is the Step B "hide host work" experiment, in a real engine.
+- **CUDA graphs only gain about 5% in vLLM**, much less than in Step B (12.5 → 10.4 ms). vLLM's eager decode issues only about 320 kernels per step (our toy model issued 950). With async scheduling the CPU can run ahead, so launch cost is mostly hidden: eager still keeps the GPU 95% busy.
+- **Batching:** 32 sequences cost 1.37× the time of one (22.2 vs 16.2 ms/step), giving 23× more throughput. At batch 1, decode streams ~3.1 GB of weights in 16.1 ms, about 190 GB/s or roughly 70% of GB10 peak.
+- **Prefill does not use CUDA graphs.** A 32 × 1024-token batch is split into chunks of up to 8192 tokens (5–7 engine steps), which is far above the largest captured graph size, so it runs piecewise-compiled kernels launched eagerly. The steps are GPU-bound (~200–270 ms each), so neither graphs nor async scheduling matter.
+
+### Answer to the original question
+
+> How many streams does a real AI inference process use?
+
+On a single GPU: **one stream for all compute, plus one for output copies.** Several hundred to several thousand more may be *created*: PyTorch's 128-stream pool and one per CUDA graph. A few more are touched during startup, but none carry inference work. Real engines get performance from **CUDA graphs** (launch overhead) and **async scheduling** (overlapping CPU work with the GPU via that one copy stream), not from concurrent compute streams. Multiple compute streams only become relevant with multi-GPU communication (DBO's `comm_stream`), KV-cache offload, or speculative decoding. None of these can be tested on this single-GPU machine except offload and speculative decoding.
+
+### Pitfalls found along the way
+
+- **nsys and vLLM:**
+  - `EngineCore` is *forked* without `exec`. Without `--trace-fork-before-exec=true`, nsys silently records only the front-end process (an 88 KB report with no CUDA data).
+  - vLLM kills `EngineCore` at shutdown, which loses trace data nsys hasn't flushed. In our first run, the last ~40% of the measured workloads were missing. The fix is `profiler_config=ProfilerConfig(profiler="cuda")` plus `llm.start_profile()` / `stop_profile()`: the worker calls `cudaProfilerStop()`, which flushes the buffers.
+- **Read the code that actually runs.** vLLM 0.32 uses Model Runner V2 (`v1/worker/gpu/model_runner.py`), not the older `gpu_model_runner.py`. The startup log line (`[model_runner.py:...]`) tells you which one. V2 has no per-step NVTX scopes; the scheduler's `schedule: update_after_schedule` range marks steps instead.
+- **FlashAttention on sm_121.** vLLM's FA2 library contains only sm_80 binaries *plus sm_80 PTX*, so the driver JIT-compiles it for GB10 on first use (cached in `~/.nv/ComputeCache`). FA3 (sm_90a) is unusable, and so are FlashMLA and DeepGEMM (sm_90a/sm_100).
+- **Unified memory:** `gpu_memory_utilization` is a fraction of *system* RAM on GB10. The default 0.9 would claim ~110 GB of a shared machine.
+
+## 7. Next
+
 - [ ] Step A follow-up: zero-copy reads of `malloc`/pinned memory from a kernel on GB10, compared with copy-then-compute.
+- [ ] vLLM features that add streams: speculative decoding (draft-token copy streams), KV-cache CPU offload. Do they add *compute* concurrency or only copies?
 - [ ] Optional: multi-stream inside one forward pass (e.g. overlapping an independent branch) to see when a second *compute* stream helps.
+- [ ] Multi-GPU (needs different hardware): NCCL communication streams, DBO `comm_stream`, `CUDA_DEVICE_MAX_CONNECTIONS=1` as used by Megatron.

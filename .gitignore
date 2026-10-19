@@ -3,5 +3,5 @@ build/
 *.ncu-rep
 *.sqlite
 __pycache__/
-.venv/
+.venv*/
 .remote.env

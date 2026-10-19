@@ -15,7 +15,7 @@ out="../results/stepB-$(date +%Y%m%d-%H%M%S).txt"
     echo; echo "################ mode=$mode ################"
     nsys profile -o "build/$mode" --force-overwrite true --trace=cuda,nvtx --cuda-graph-trace=node \
       "$PY" infer.py --mode "$mode" --steps 32 "$@" 2>&1 | grep -E "^mode=|[Ee]rror" || true
-    python3 nsys_streams.py "build/$mode.nsys-rep"
+    python3 ../nsys_streams.py "build/$mode.nsys-rep"
   done
 
   # Async copies only pay off when the host has its own per-token work and the GPU is the bottleneck.

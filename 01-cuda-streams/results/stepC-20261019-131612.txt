@@ -1,0 +1,209 @@
+vllm 0.32.0 | torch 2.13.0+cu130 | CUDA 13.0 | NVIDIA GB10
+NVIDIA Nsight Systems version 2025.3.2.474-253236389321v0
+
+################ config=default ################
+(MainProcess pid=18016) INFO 10-19 13:16:19 [api_utils.py:286] non-default args: {'max_model_len': 2048, 'enable_prefix_caching': False, 'gpu_memory_utilization': 0.3, 'disable_log_stats': True, 'profiler_config': ProfilerConfig(profiler='cuda', torch_profiler_dir='', torch_profiler_activities=None, proton_profiler_dir='', proton_context='shadow', proton_data='tree', proton_backend=None, proton_mode=None, proton_hook=None, proton_output_format=None, proton_graph_attribution=False, torch_profiler_with_stack=True, torch_profiler_with_flops=False, torch_profiler_use_gzip=True, torch_profiler_dump_cuda_time_total=True, torch_profiler_record_shapes=False, torch_profiler_with_memory=False, capture_torch_profiler=False, detailed_trace_annotation=False, ignore_frontend=False, delay_iterations=0, max_iterations=0, warmup_iterations=0, active_iterations=5, wait_iterations=0), 'model': 'Qwen/Qwen2.5-1.5B-Instruct'}
+(EngineCore pid=18101) INFO 10-19 13:16:22 [core.py:133] Initializing a V1 LLM engine (v0.32.0) with config: model='Qwen/Qwen2.5-1.5B-Instruct', speculative_config=None, tokenizer='Qwen/Qwen2.5-1.5B-Instruct', skip_tokenizer_init=False, tokenizer_mode=auto, revision=main, tokenizer_revision=main, trust_remote_code=False, dtype=torch.bfloat16, max_seq_len=2048, download_dir=None, load_format=auto, tensor_parallel_size=1, pipeline_parallel_size=1, data_parallel_size=1, decode_context_parallel_size=1, dcp_comm_backend=ag_rs, disable_custom_all_reduce=False, quantization=None, quantization_config=None, enforce_eager=False, aux_output_config=AuxOutputConfig(enable_return_routed_experts=False, max_bytes=None), kv_cache_dtype=auto, device_config=cuda, structured_outputs_config=StructuredOutputsConfig(backend='auto', disable_any_whitespace=False, disable_additional_properties=False, reasoning_parser='', reasoning_parser_plugin='', enable_in_reasoning=False), observability_config=ObservabilityConfig(show_hidden_metrics_for_version=None, otlp_traces_endpoint=None, collect_detailed_traces=None, per_request_spec_decode_metrics='none', kv_cache_metrics=False, kv_cache_metrics_sample=0.01, custom_histogram_buckets=None, cudagraph_metrics=False, enable_layerwise_nvtx_tracing=False, enable_mfu_metrics=False, enable_mm_processor_stats=False, enable_logging_iteration_details=False, jit_monitor_mode='warn', jit_monitor_verbose=False), seed=0, served_model_name=Qwen/Qwen2.5-1.5B-Instruct, enable_prefix_caching=False, enable_chunked_prefill=True, pooler_config=None, compilation_config={'mode': <CompilationMode.VLLM_COMPILE: 3>, 'debug_dump_path': None, 'cache_dir': '', 'compile_cache_save_format': 'binary', 'backend': 'inductor', 'custom_ops': ['none'], 'ir_enable_torch_wrap': True, 'splitting_ops': ['vllm::unified_attention_with_output', 'vllm::unified_mla_attention_with_output', 'vllm::mamba_mixer2', 'vllm::mamba_mixer', 'vllm::short_conv', 'vllm::qwen4_exp_ple_short_conv', 'vllm::qwen4_exp_qsa_with_output', 'vllm::qwen4_exp_qsa_prepare_with_output', 'vllm::linear_attention', 'vllm::qwen_gdn_attention_core', 'vllm::qwen_gdn_attention_core_fused_norm_packed', 'vllm::gdn_attention_core_xpu', 'vllm::olmo_hybrid_gdn_full_forward', 'vllm::sparse_attn_indexer', 'vllm::rocm_aiter_sparse_attn_indexer', 'vllm::deepseek_v4_attention', 'vllm::hpc_rope_norm_forward', 'vllm::unified_kv_cache_update', 'vllm::unified_mla_kv_cache_update'], 'compile_mm_encoder': False, 'cudagraph_mm_encoder': False, 'encoder_cudagraph_token_budgets': [], 'encoder_cudagraph_max_vision_items_per_batch': 0, 'encoder_cudagraph_max_frames_per_batch': None, 'cudagraph_decoder_replay': True, 'decoder_replay_cudagraph_capture_sizes': [], 'decoder_replay_trim_threshold': 768, 'compile_sizes': [], 'compile_ranges_endpoints': [8192], 'inductor_compile_config': {'enable_auto_functionalized_v2': False, 'combo_kernels': True, 'benchmark_combo_kernel': True}, 'inductor_passes': {}, 'cudagraph_mode': <CUDAGraphMode.FULL_AND_PIECEWISE: (2, 1)>, 'cudagraph_num_of_warmups': 1, 'cudagraph_capture_sizes': [1, 2, 4, 8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 128, 136, 144, 152, 160, 168, 176, 184, 192, 200, 208, 216, 224, 232, 240, 248, 256, 272, 288, 304, 320, 336, 352, 368, 384, 400, 416, 432, 448, 464, 480, 496, 512], 'cudagraph_copy_inputs': False, 'cudagraph_specialize_lora': True, 'use_inductor_graph_partition': False, 'pass_config': {'fuse_norm_quant': False, 'fuse_act_quant': False, 'fuse_attn_quant': False, 'fuse_allreduce_rms': False, 'enable_qk_norm_rope_fusion': False, 'fuse_rope_kvcache_cat_mla': False, 'fuse_act_padding': False, 'fuse_qk_norm_rope_kvcache': False}, 'max_cudagraph_capture_size': 512, 'dynamic_shapes_config': {'type': <DynamicShapesType.BACKED: 'backed'>, 'evaluate_guards': False, 'assume_32_bit_indexing': False}, 'local_cache_dir': None, 'fast_moe_cold_start': False, 'static_all_moe_layers': []}, kernel_config=KernelConfig(ir_op_priority=IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'], gelu_and_mul_sparse=['triton', 'native']), enable_flashinfer_autotune=True, enable_rocm_segmented_attn_autotune=False, enable_cutedsl_warmup=True, enable_jit_warmup=True, moe_backend='auto', sparse_indexer_topk_backend='auto', linear_backend='auto', linear_backend_per_quant=None)
+(EngineCore pid=18101) INFO 10-19 13:16:23 [parallel_state.py:1906] world_size=1 rank=0 local_rank=0 distributed_init_method=file:///tmp/vllm_dist_edc5d1428198467382a0b8ba09b2a63d backend=nccl
+(EngineCore pid=18101) INFO 10-19 13:16:24 [cuda.py:506] Using FLASH_ATTN attention backend out of potential backends: ['FLASH_ATTN', 'FLASHINFER', 'TRITON_ATTN', 'FLEX_ATTENTION'].
+RESULT config=default workload=decode-b1 requests=1 prompt=512 output=128: 2111.6 ms, 61 output tok/s, 242 prompt tok/s, 16.50 ms per output step
+RESULT config=default workload=decode-b32 requests=32 prompt=512 output=128: 2904.7 ms, 1410 output tok/s, 5641 prompt tok/s, 22.69 ms per output step
+RESULT config=default workload=prefill-b32 requests=32 prompt=1024 output=1: 1388.8 ms, 23 output tok/s, 23595 prompt tok/s, 1388.77 ms per output step
+[process 18101 VLLM::EngineCor] null stream id = 7
+  [created] 3130 streams, by priority: {-5: 1, -3: 32, -2: 32, -1: 32, 0: 3033}; stream-create / graph-instantiate calls: {'cudaStreamCreateWithPriority_v5050': 128, 'cudaGraphInstantiateWithFlags_v11040': 2995}
+  [active]  5 streams received work during the whole run: [7, 13, 21, 25, 29]
+
+[measured:decode-b1] wall 2111.6 ms, GPU busy 2094.5 ms (99%), 45919 GPU ops, 130 model steps
+
+  phase=all: 2 stream(s) with work, 321 kernels/step, GPU kernel time 16.11 ms/step
+  wall 16.24 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.01 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0    41713     39468    3950       0   2094.18 100.0% (null)
+        13     0        0         0     256       0      0.60   0.0%
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     18101      7   Device-to-Device       Device->Device       3072 B: 3683
+     18101      7     Host-to-Device       Pinned->Device          8 B: 128
+     18101      7     Host-to-Device       Pinned->Device       1028 B: 128
+     18101     13     Device-to-Host       Device->Pinned          8 B: 128
+     18101     13     Device-to-Host       Device->Pinned          4 B: 128
+     18101      7     Host-to-Device       Pinned->Device          4 B: 10
+     18101      7     Host-to-Device       Pinned->Device        128 B: 1
+
+[measured:decode-b32] wall 2904.7 ms, GPU busy 2859.1 ms (98%), 57181 GPU ops, 131 model steps
+
+  phase=all: 2 stream(s) with work, 377 kernels/step, GPU kernel time 21.83 ms/step
+  wall 22.17 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.02 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0    49447     46355     418    7056   2859.44 100.0% (null)
+        13     0        0         0     260       0      0.75   0.0%
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     18101      7     Host-to-Device       Pinned->Device       1028 B: 130
+     18101      7     Host-to-Device       Pinned->Device        256 B: 126
+     18101     13     Device-to-Host       Device->Pinned        256 B: 126
+     18101     13     Device-to-Host       Device->Pinned        128 B: 126
+     18101      7   Device-to-Device       Device->Device      98304 B: 126
+     18101      7     Host-to-Device       Pinned->Device         12 B: 9
+     18101      7     Host-to-Device       Pinned->Device         56 B: 8
+     18101      7     Host-to-Device       Pinned->Device         60 B: 7
+     18101      7     Host-to-Device       Pinned->Device         64 B: 2
+     18101      7     Host-to-Device       Pinned->Device         52 B: 2
+     18101      7     Host-to-Device       Pinned->Device        384 B: 1
+     18101      7     Host-to-Device       Pinned->Device         24 B: 1
+
+[measured:prefill-b32] wall 1388.8 ms, GPU busy 1376.6 ms (99%), 1240 GPU ops, 6 model steps
+
+  phase=all: 2 stream(s) with work, 202 kernels/step, GPU kernel time 229.43 ms/step
+  wall 231.46 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.01 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0     1212         0      20       0   1376.58 100.0% (null)
+        13     0        0         0       8       0      0.03   0.0%
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     18101      7     Host-to-Device       Pinned->Device         32 B: 8
+     18101      7     Host-to-Device       Pinned->Device       2048 B: 4
+     18101      7     Host-to-Device       Pinned->Device         64 B: 4
+     18101      7     Host-to-Device       Pinned->Device       1028 B: 4
+     18101     13     Device-to-Host       Device->Pinned         64 B: 4
+     18101     13     Device-to-Host       Device->Pinned         32 B: 4
+
+################ config=no-async ################
+(MainProcess pid=18450) INFO 10-19 13:17:19 [api_utils.py:286] non-default args: {'max_model_len': 2048, 'enable_prefix_caching': False, 'gpu_memory_utilization': 0.3, 'disable_log_stats': True, 'profiler_config': ProfilerConfig(profiler='cuda', torch_profiler_dir='', torch_profiler_activities=None, proton_profiler_dir='', proton_context='shadow', proton_data='tree', proton_backend=None, proton_mode=None, proton_hook=None, proton_output_format=None, proton_graph_attribution=False, torch_profiler_with_stack=True, torch_profiler_with_flops=False, torch_profiler_use_gzip=True, torch_profiler_dump_cuda_time_total=True, torch_profiler_record_shapes=False, torch_profiler_with_memory=False, capture_torch_profiler=False, detailed_trace_annotation=False, ignore_frontend=False, delay_iterations=0, max_iterations=0, warmup_iterations=0, active_iterations=5, wait_iterations=0), 'async_scheduling': False, 'model': 'Qwen/Qwen2.5-1.5B-Instruct'}
+(EngineCore pid=18536) INFO 10-19 13:17:22 [core.py:133] Initializing a V1 LLM engine (v0.32.0) with config: model='Qwen/Qwen2.5-1.5B-Instruct', speculative_config=None, tokenizer='Qwen/Qwen2.5-1.5B-Instruct', skip_tokenizer_init=False, tokenizer_mode=auto, revision=main, tokenizer_revision=main, trust_remote_code=False, dtype=torch.bfloat16, max_seq_len=2048, download_dir=None, load_format=auto, tensor_parallel_size=1, pipeline_parallel_size=1, data_parallel_size=1, decode_context_parallel_size=1, dcp_comm_backend=ag_rs, disable_custom_all_reduce=False, quantization=None, quantization_config=None, enforce_eager=False, aux_output_config=AuxOutputConfig(enable_return_routed_experts=False, max_bytes=None), kv_cache_dtype=auto, device_config=cuda, structured_outputs_config=StructuredOutputsConfig(backend='auto', disable_any_whitespace=False, disable_additional_properties=False, reasoning_parser='', reasoning_parser_plugin='', enable_in_reasoning=False), observability_config=ObservabilityConfig(show_hidden_metrics_for_version=None, otlp_traces_endpoint=None, collect_detailed_traces=None, per_request_spec_decode_metrics='none', kv_cache_metrics=False, kv_cache_metrics_sample=0.01, custom_histogram_buckets=None, cudagraph_metrics=False, enable_layerwise_nvtx_tracing=False, enable_mfu_metrics=False, enable_mm_processor_stats=False, enable_logging_iteration_details=False, jit_monitor_mode='warn', jit_monitor_verbose=False), seed=0, served_model_name=Qwen/Qwen2.5-1.5B-Instruct, enable_prefix_caching=False, enable_chunked_prefill=True, pooler_config=None, compilation_config={'mode': <CompilationMode.VLLM_COMPILE: 3>, 'debug_dump_path': None, 'cache_dir': '', 'compile_cache_save_format': 'binary', 'backend': 'inductor', 'custom_ops': ['none'], 'ir_enable_torch_wrap': True, 'splitting_ops': ['vllm::unified_attention_with_output', 'vllm::unified_mla_attention_with_output', 'vllm::mamba_mixer2', 'vllm::mamba_mixer', 'vllm::short_conv', 'vllm::qwen4_exp_ple_short_conv', 'vllm::qwen4_exp_qsa_with_output', 'vllm::qwen4_exp_qsa_prepare_with_output', 'vllm::linear_attention', 'vllm::qwen_gdn_attention_core', 'vllm::qwen_gdn_attention_core_fused_norm_packed', 'vllm::gdn_attention_core_xpu', 'vllm::olmo_hybrid_gdn_full_forward', 'vllm::sparse_attn_indexer', 'vllm::rocm_aiter_sparse_attn_indexer', 'vllm::deepseek_v4_attention', 'vllm::hpc_rope_norm_forward', 'vllm::unified_kv_cache_update', 'vllm::unified_mla_kv_cache_update'], 'compile_mm_encoder': False, 'cudagraph_mm_encoder': False, 'encoder_cudagraph_token_budgets': [], 'encoder_cudagraph_max_vision_items_per_batch': 0, 'encoder_cudagraph_max_frames_per_batch': None, 'cudagraph_decoder_replay': True, 'decoder_replay_cudagraph_capture_sizes': [], 'decoder_replay_trim_threshold': 768, 'compile_sizes': [], 'compile_ranges_endpoints': [8192], 'inductor_compile_config': {'enable_auto_functionalized_v2': False, 'combo_kernels': True, 'benchmark_combo_kernel': True}, 'inductor_passes': {}, 'cudagraph_mode': <CUDAGraphMode.FULL_AND_PIECEWISE: (2, 1)>, 'cudagraph_num_of_warmups': 1, 'cudagraph_capture_sizes': [1, 2, 4, 8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 128, 136, 144, 152, 160, 168, 176, 184, 192, 200, 208, 216, 224, 232, 240, 248, 256, 272, 288, 304, 320, 336, 352, 368, 384, 400, 416, 432, 448, 464, 480, 496, 512], 'cudagraph_copy_inputs': False, 'cudagraph_specialize_lora': True, 'use_inductor_graph_partition': False, 'pass_config': {'fuse_norm_quant': False, 'fuse_act_quant': False, 'fuse_attn_quant': False, 'fuse_allreduce_rms': False, 'enable_qk_norm_rope_fusion': False, 'fuse_rope_kvcache_cat_mla': False, 'fuse_act_padding': False, 'fuse_qk_norm_rope_kvcache': False}, 'max_cudagraph_capture_size': 512, 'dynamic_shapes_config': {'type': <DynamicShapesType.BACKED: 'backed'>, 'evaluate_guards': False, 'assume_32_bit_indexing': False}, 'local_cache_dir': None, 'fast_moe_cold_start': False, 'static_all_moe_layers': []}, kernel_config=KernelConfig(ir_op_priority=IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'], gelu_and_mul_sparse=['triton', 'native']), enable_flashinfer_autotune=True, enable_rocm_segmented_attn_autotune=False, enable_cutedsl_warmup=True, enable_jit_warmup=True, moe_backend='auto', sparse_indexer_topk_backend='auto', linear_backend='auto', linear_backend_per_quant=None)
+(EngineCore pid=18536) INFO 10-19 13:17:23 [parallel_state.py:1906] world_size=1 rank=0 local_rank=0 distributed_init_method=file:///tmp/vllm_dist_c64ef910352e4ce2b17b9f299e37ab76 backend=nccl
+(EngineCore pid=18536) INFO 10-19 13:17:24 [cuda.py:506] Using FLASH_ATTN attention backend out of potential backends: ['FLASH_ATTN', 'FLASHINFER', 'TRITON_ATTN', 'FLEX_ATTENTION'].
+RESULT config=no-async workload=decode-b1 requests=1 prompt=512 output=128: 2418.1 ms, 53 output tok/s, 212 prompt tok/s, 18.89 ms per output step
+RESULT config=no-async workload=decode-b32 requests=32 prompt=512 output=128: 3287.5 ms, 1246 output tok/s, 4984 prompt tok/s, 25.68 ms per output step
+RESULT config=no-async workload=prefill-b32 requests=32 prompt=1024 output=1: 1397.1 ms, 23 output tok/s, 23454 prompt tok/s, 1397.13 ms per output step
+[process 18536 python] null stream id = 7
+  [created] 3130 streams, by priority: {-5: 1, -3: 32, -2: 32, -1: 32, 0: 3033}; stream-create / graph-instantiate calls: {'cudaStreamCreateWithPriority_v5050': 128, 'cudaGraphInstantiateWithFlags_v11040': 2995}
+  [active]  5 streams received work during the whole run: [7, 13, 21, 25, 29]
+
+[measured:decode-b1] wall 2418.1 ms, GPU busy 2102.5 ms (87%), 45919 GPU ops, 129 model steps
+
+  phase=all: 2 stream(s) with work, 323 kernels/step, GPU kernel time 16.30 ms/step
+  wall 18.74 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.00 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0    41713     39468    3950       0   2102.24 100.0% (null)
+        13     0        0         0     256       0      0.52   0.0%
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     18536      7   Device-to-Device       Device->Device       3072 B: 3683
+     18536      7     Host-to-Device       Pinned->Device          8 B: 128
+     18536      7     Host-to-Device       Pinned->Device       1028 B: 128
+     18536     13     Device-to-Host       Device->Pinned          8 B: 128
+     18536     13     Device-to-Host       Device->Pinned          4 B: 128
+     18536      7     Host-to-Device       Pinned->Device          4 B: 10
+     18536      7     Host-to-Device       Pinned->Device        128 B: 1
+
+[measured:decode-b32] wall 3287.5 ms, GPU busy 2875.3 ms (87%), 57181 GPU ops, 131 model steps
+
+  phase=all: 2 stream(s) with work, 377 kernels/step, GPU kernel time 21.96 ms/step
+  wall 25.10 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.02 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0    49447     46355     418    7056   2875.68 100.0% (null)
+        13     0        0         0     260       0      0.74   0.0%
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     18536      7     Host-to-Device       Pinned->Device       1028 B: 130
+     18536      7     Host-to-Device       Pinned->Device        256 B: 126
+     18536     13     Device-to-Host       Device->Pinned        256 B: 126
+     18536     13     Device-to-Host       Device->Pinned        128 B: 126
+     18536      7   Device-to-Device       Device->Device      98304 B: 126
+     18536      7     Host-to-Device       Pinned->Device         28 B: 9
+     18536      7     Host-to-Device       Pinned->Device         40 B: 8
+     18536      7     Host-to-Device       Pinned->Device         60 B: 7
+     18536      7     Host-to-Device       Pinned->Device         64 B: 2
+     18536      7     Host-to-Device       Pinned->Device         36 B: 2
+     18536      7     Host-to-Device       Pinned->Device        896 B: 1
+     18536      7     Host-to-Device       Pinned->Device         56 B: 1
+
+[measured:prefill-b32] wall 1397.1 ms, GPU busy 1368.3 ms (98%), 1240 GPU ops, 5 model steps
+
+  phase=all: 2 stream(s) with work, 242 kernels/step, GPU kernel time 273.67 ms/step
+  wall 279.43 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.01 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0     1212         0      20       0   1368.34 100.0% (null)
+        13     0        0         0       8       0      0.02   0.0%
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     18536      7     Host-to-Device       Pinned->Device         32 B: 8
+     18536      7     Host-to-Device       Pinned->Device       2048 B: 4
+     18536      7     Host-to-Device       Pinned->Device         64 B: 4
+     18536      7     Host-to-Device       Pinned->Device       1028 B: 4
+     18536     13     Device-to-Host       Device->Pinned         64 B: 4
+     18536     13     Device-to-Host       Device->Pinned         32 B: 4
+
+################ config=eager ################
+(MainProcess pid=18858) INFO 10-19 13:18:19 [api_utils.py:286] non-default args: {'max_model_len': 2048, 'enable_prefix_caching': False, 'gpu_memory_utilization': 0.3, 'disable_log_stats': True, 'enforce_eager': True, 'profiler_config': ProfilerConfig(profiler='cuda', torch_profiler_dir='', torch_profiler_activities=None, proton_profiler_dir='', proton_context='shadow', proton_data='tree', proton_backend=None, proton_mode=None, proton_hook=None, proton_output_format=None, proton_graph_attribution=False, torch_profiler_with_stack=True, torch_profiler_with_flops=False, torch_profiler_use_gzip=True, torch_profiler_dump_cuda_time_total=True, torch_profiler_record_shapes=False, torch_profiler_with_memory=False, capture_torch_profiler=False, detailed_trace_annotation=False, ignore_frontend=False, delay_iterations=0, max_iterations=0, warmup_iterations=0, active_iterations=5, wait_iterations=0), 'model': 'Qwen/Qwen2.5-1.5B-Instruct'}
+(EngineCore pid=18944) INFO 10-19 13:18:22 [core.py:133] Initializing a V1 LLM engine (v0.32.0) with config: model='Qwen/Qwen2.5-1.5B-Instruct', speculative_config=None, tokenizer='Qwen/Qwen2.5-1.5B-Instruct', skip_tokenizer_init=False, tokenizer_mode=auto, revision=main, tokenizer_revision=main, trust_remote_code=False, dtype=torch.bfloat16, max_seq_len=2048, download_dir=None, load_format=auto, tensor_parallel_size=1, pipeline_parallel_size=1, data_parallel_size=1, decode_context_parallel_size=1, dcp_comm_backend=ag_rs, disable_custom_all_reduce=False, quantization=None, quantization_config=None, enforce_eager=True, aux_output_config=AuxOutputConfig(enable_return_routed_experts=False, max_bytes=None), kv_cache_dtype=auto, device_config=cuda, structured_outputs_config=StructuredOutputsConfig(backend='auto', disable_any_whitespace=False, disable_additional_properties=False, reasoning_parser='', reasoning_parser_plugin='', enable_in_reasoning=False), observability_config=ObservabilityConfig(show_hidden_metrics_for_version=None, otlp_traces_endpoint=None, collect_detailed_traces=None, per_request_spec_decode_metrics='none', kv_cache_metrics=False, kv_cache_metrics_sample=0.01, custom_histogram_buckets=None, cudagraph_metrics=False, enable_layerwise_nvtx_tracing=False, enable_mfu_metrics=False, enable_mm_processor_stats=False, enable_logging_iteration_details=False, jit_monitor_mode='warn', jit_monitor_verbose=False), seed=0, served_model_name=Qwen/Qwen2.5-1.5B-Instruct, enable_prefix_caching=False, enable_chunked_prefill=True, pooler_config=None, compilation_config={'mode': <CompilationMode.NONE: 0>, 'debug_dump_path': None, 'cache_dir': '', 'compile_cache_save_format': 'binary', 'backend': 'inductor', 'custom_ops': ['all'], 'ir_enable_torch_wrap': False, 'splitting_ops': [], 'compile_mm_encoder': False, 'cudagraph_mm_encoder': False, 'encoder_cudagraph_token_budgets': [], 'encoder_cudagraph_max_vision_items_per_batch': 0, 'encoder_cudagraph_max_frames_per_batch': None, 'cudagraph_decoder_replay': True, 'decoder_replay_cudagraph_capture_sizes': [], 'decoder_replay_trim_threshold': 768, 'compile_sizes': [], 'compile_ranges_endpoints': [8192], 'inductor_compile_config': {'enable_auto_functionalized_v2': False, 'combo_kernels': True, 'benchmark_combo_kernel': True}, 'inductor_passes': {}, 'cudagraph_mode': <CUDAGraphMode.NONE: 0>, 'cudagraph_num_of_warmups': 0, 'cudagraph_capture_sizes': [], 'cudagraph_copy_inputs': False, 'cudagraph_specialize_lora': True, 'use_inductor_graph_partition': False, 'pass_config': {'fuse_norm_quant': True, 'fuse_act_quant': True, 'fuse_attn_quant': False, 'fuse_allreduce_rms': False, 'enable_qk_norm_rope_fusion': False, 'fuse_rope_kvcache_cat_mla': False, 'fuse_act_padding': False, 'fuse_qk_norm_rope_kvcache': False}, 'max_cudagraph_capture_size': 0, 'dynamic_shapes_config': {'type': <DynamicShapesType.BACKED: 'backed'>, 'evaluate_guards': False, 'assume_32_bit_indexing': False}, 'local_cache_dir': None, 'fast_moe_cold_start': False, 'static_all_moe_layers': []}, kernel_config=KernelConfig(ir_op_priority=IrOpPriorityConfig(rms_norm=['vllm_c', 'native'], fused_add_rms_norm=['vllm_c', 'native'], gelu_and_mul_sparse=['triton', 'native']), enable_flashinfer_autotune=True, enable_rocm_segmented_attn_autotune=False, enable_cutedsl_warmup=True, enable_jit_warmup=False, moe_backend='auto', sparse_indexer_topk_backend='auto', linear_backend='auto', linear_backend_per_quant=None)
+(EngineCore pid=18944) INFO 10-19 13:18:23 [parallel_state.py:1906] world_size=1 rank=0 local_rank=0 distributed_init_method=file:///tmp/vllm_dist_327cb91cbf944e6badedac544808c3cd backend=nccl
+(EngineCore pid=18944) INFO 10-19 13:18:24 [cuda.py:506] Using FLASH_ATTN attention backend out of potential backends: ['FLASH_ATTN', 'FLASHINFER', 'TRITON_ATTN', 'FLEX_ATTENTION'].
+RESULT config=eager workload=decode-b1 requests=1 prompt=512 output=128: 2220.1 ms, 58 output tok/s, 231 prompt tok/s, 17.34 ms per output step
+RESULT config=eager workload=decode-b32 requests=32 prompt=512 output=128: 3021.5 ms, 1356 output tok/s, 5422 prompt tok/s, 23.61 ms per output step
+RESULT config=eager workload=prefill-b32 requests=32 prompt=1024 output=1: 1400.4 ms, 23 output tok/s, 23399 prompt tok/s, 1400.37 ms per output step
+[process 18944 VLLM::EngineCor] null stream id = 7
+  [created] 135 streams, by priority: {-5: 1, -3: 32, -2: 32, -1: 32, 0: 38}; stream-create / graph-instantiate calls: {'cudaStreamCreateWithPriority_v5050': 128}
+  [active]  2 streams received work during the whole run: [7, 13]
+
+[measured:decode-b1] wall 2220.1 ms, GPU busy 2114.8 ms (95%), 46048 GPU ops, 130 model steps
+
+  phase=all: 2 stream(s) with work, 323 kernels/step, GPU kernel time 16.27 ms/step
+  wall 17.08 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.01 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0    41969         0    3823       0   2114.45 100.0% (null)
+        13     0        0         0     256       0      0.62   0.0%
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     18944      7   Device-to-Device       Device->Device       3072 B: 3556
+     18944      7     Host-to-Device       Pinned->Device          8 B: 128
+     18944      7     Host-to-Device       Pinned->Device       1028 B: 128
+     18944     13     Device-to-Host       Device->Pinned          8 B: 128
+     18944     13     Device-to-Host       Device->Pinned          4 B: 128
+     18944      7     Host-to-Device       Pinned->Device          4 B: 10
+     18944      7     Host-to-Device       Pinned->Device        128 B: 1
+
+[measured:decode-b32] wall 3021.6 ms, GPU busy 2909.8 ms (96%), 57312 GPU ops, 131 model steps
+
+  phase=all: 2 stream(s) with work, 379 kernels/step, GPU kernel time 22.22 ms/step
+  wall 23.07 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.02 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0    49705         0     291    7056   2909.86 100.0% (null)
+        13     0        0         0     260       0      0.74   0.0%
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     18944      7     Host-to-Device       Pinned->Device       1028 B: 130
+     18944      7     Host-to-Device       Pinned->Device        256 B: 126
+     18944     13     Device-to-Host       Device->Pinned        256 B: 126
+     18944     13     Device-to-Host       Device->Pinned        128 B: 126
+     18944      7     Host-to-Device       Pinned->Device         20 B: 9
+     18944      7     Host-to-Device       Pinned->Device         48 B: 8
+     18944      7     Host-to-Device       Pinned->Device         60 B: 7
+     18944      7     Host-to-Device       Pinned->Device         64 B: 2
+     18944      7     Host-to-Device       Pinned->Device         44 B: 2
+     18944      7     Host-to-Device       Pinned->Device        640 B: 1
+     18944      7     Host-to-Device       Pinned->Device         40 B: 1
+     18944     13     Device-to-Host       Device->Pinned         40 B: 1
+
+[measured:prefill-b32] wall 1400.4 ms, GPU busy 1387.6 ms (99%), 1560 GPU ops, 7 model steps
+
+  phase=all: 2 stream(s) with work, 218 kernels/step, GPU kernel time 198.24 ms/step
+  wall 200.06 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.01 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0     1525         0      25       0   1387.64 100.0% (null)
+        13     0        0         0      10       0      0.04   0.0%
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     18944      7     Host-to-Device       Pinned->Device         32 B: 6
+     18944      7     Host-to-Device       Pinned->Device       1028 B: 5
+     18944      7     Host-to-Device       Pinned->Device       2048 B: 3
+     18944      7     Host-to-Device       Pinned->Device         64 B: 3
+     18944     13     Device-to-Host       Device->Pinned         64 B: 3
+     18944     13     Device-to-Host       Device->Pinned         32 B: 3
+     18944      7     Host-to-Device       Pinned->Device          4 B: 2
+     18944      7     Host-to-Device       Pinned->Device         28 B: 2
+     18944      7     Host-to-Device       Pinned->Device        256 B: 1
+     18944      7     Host-to-Device       Pinned->Device          8 B: 1
+     18944     13     Device-to-Host       Device->Pinned          8 B: 1
+     18944     13     Device-to-Host       Device->Pinned          4 B: 1
