@@ -12,7 +12,7 @@ Workloads use real text through the chat template, because acceptance depends on
              DraftTokensHandler copies draft tokens back to the host on its own stream
 
 The b1 prompt is the first b32 prompt, so b1 vs b32 shows how much greedy output depends on batch shape alone.
-Generated token ids go to build/spec-tokens-<config>.json for spec_compare.py. The baseline also runs every workload
+Generated token ids go to build/spec-tokens-<config>.json for compare_tokens.py. The baseline also runs every workload
 once more with logprobs=2, outside the measured range. That pass is the reference: it has the top-2 logprobs at
 every position of its own output, which tells near-ties from real errors where another run diverges from it.
 

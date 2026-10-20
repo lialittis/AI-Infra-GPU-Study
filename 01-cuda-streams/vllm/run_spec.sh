@@ -21,6 +21,6 @@ export VLLM_NVTX_SCOPES_FOR_PROFILING=1
     python3 ../nsys_streams.py "build/spec-$config.nsys-rep" || echo "analysis of $config failed"
   done
   echo; echo "################ output comparison ################"
-  python3 spec_compare.py build
+  python3 compare_tokens.py build spec baseline
 } 2>&1 | tee "$out"
 echo "saved to $out"

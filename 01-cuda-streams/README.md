@@ -7,10 +7,11 @@ Plan:
 - **Step B** ([`pytorch/`](pytorch/)): a PyTorch generation loop under `nsys`.
 - **Step C** ([`vllm/`](vllm/)): vLLM serving a real model under `nsys`.
 - **Step D** ([`vllm/spec.py`](vllm/spec.py)): vLLM speculative decoding, a feature expected to add streams.
+- **Step E** ([`vllm/offload.py`](vllm/offload.py)): vLLM KV-cache CPU offload, the other one.
 
 ## Summary
 
-Measured on a single GB10. Details and numbers are in sections 3, 5, 6 and 7.
+Measured on a single GB10. Details and numbers are in sections 3, 5, 6, 7 and 8.
 
 **How streams work (Step A):**
 - A stream is an in-order queue. Streams give the GPU *permission* to overlap work; free SMs decide whether it actually does (concurrency ≈ min(#streams, capacity / blocks per kernel)).
@@ -33,7 +34,8 @@ Measured on a single GB10. Details and numbers are in sections 3, 5, 6 and 7.
 - **Performance comes from two other mechanisms:**
   - **CUDA graphs** remove CPU launch overhead. Step B's eager loop was launch-bound (~13 µs × 950 kernels per step on this CPU).
   - **Async scheduling** overlaps per-token CPU work with GPU work through that one copy stream. In vLLM, async scheduling is worth 13–15% and graphs about 5%.
-- **Speculative decoding (Step D) adds no compute stream either.** The draft model and the verify pass run one after the other on the null stream. The only new active stream copies draft tokens to the host, and only when structured output needs them. KV offload's streams are copy streams too (from the source; not measured yet).
+- **Speculative decoding (Step D) adds no compute stream either.** The draft model and the verify pass run one after the other on the null stream. The only new active stream copies draft tokens to the host, and only when structured output needs them.
+- **KV offload (Step E) adds transfer streams, not compute streams.** Its copies overlap decode compute (46–94% of their busy time), stores cost 1–5%, and reloading an evicted 2k-token prefix is ~10× faster than recomputing it.
 - Multiple *compute* streams appear only for multi-GPU communication and micro-batch overlap, which a single GPU can't exercise.
 
 What graphs and async copies cost in correctness, and how each failure ties back to these results, is covered in
@@ -329,7 +331,7 @@ streams, or only copies? And what does it cost and change?
 
 Code is in [`vllm/`](vllm/):
 - `spec.py`: configs × workloads, each workload in an NVTX `measured:<name>` range.
-- `spec_compare.py`: token-by-token comparison against a baseline reference.
+- `compare_tokens.py`: token-by-token comparison against a reference config (shared with Step E).
 - `run_spec.sh`: runs every config under nsys, then `../nsys_streams.py`, then the comparison.
 
 Raw output is in `results/stepD-*.txt`. Same engine and model as Step C (vLLM 0.32.0, Qwen2.5-1.5B-Instruct, bf16).
@@ -416,7 +418,7 @@ What explains the numbers:
 
 ### Correctness: greedy output changes only at near-ties
 
-With temperature 0, speculative decoding is meant to produce exactly the target model's text. `spec_compare.py`
+With temperature 0, speculative decoding is meant to produce exactly the target model's text. `compare_tokens.py`
 checks this the way 02 does: token by token against a reference, which is the baseline run again with
 `logprobs=2`. At each first mismatch it reads the reference's top-2 logprob gap.
 
@@ -447,11 +449,128 @@ from doing more work per weight read, as batching does. On GB10 with vLLM 0.32:
 - Prompt lookup is the clear win when outputs repeat the input.
 - A draft model is limited by running without CUDA graphs and by its size relative to the target.
 
-## 8. Next
+## 8. Step E: KV-cache CPU offload in vLLM
+
+**Question:** KV offload moves cache blocks between GPU and host memory on side streams. Do those transfers
+overlap with compute? What do they cost when nothing is reused, and what do they save when an evicted prefix
+comes back?
+
+Code is in [`vllm/`](vllm/): `offload.py` (configs × workloads), `run_offload.sh` (nsys + `../nsys_streams.py`
++ `compare_tokens.py`). Raw output is in `results/stepE-*.txt`. Same engine and model as Steps C/D, with
+**prefix caching on**.
+
+**What the two offload paths do** (vLLM 0.32 source, confirmed in the traces):
+
+| | `native` (`OffloadingConnector`, default) | `simple` (`SimpleCPUOffloadConnector`, `VLLM_USE_SIMPLE_KV_OFFLOAD=1`) |
+|---|---|---|
+| Enabled by | `kv_offloading_size=<GiB>` | the same + env var |
+| Streams | one stream per transfer, from PyTorch's pool, default priority; each waits on compute and on the previous transfer | one load and one store stream, **lowest** priority, gated by a compute-done event |
+| Stores (GPU→CPU) | `cuMemcpyBatchAsync` (copy engine), every full block written through as it is computed | `cuMemcpyBatchAsync` |
+| Loads (CPU→GPU) | Triton `_swap_blocks_kernel` reading pinned host memory (used for pages < 28 KiB), so loads run **on the SMs** | `cuMemcpyBatchAsync` (copy engine) |
+
+| Config | GPU KV cache | Offload |
+|---|---|---|
+| `prefix` | 0.5 GiB (~18.7k tokens at 28 KiB/token) | none: an evicted prefix is recomputed |
+| `prefix-big` | 8 GiB: nothing is evicted | none |
+| `offload-native` / `offload-simple` | 0.5 GiB | 8 GiB of pinned host memory |
+
+| Workload | What runs |
+|---|---|
+| `reuse-prefill` | fill with 32 distinct 2048-token documents (3.5× the small cache); measured: documents 0–15 again with a new 32-token suffix, 1 output token |
+| `reuse-decode` | the same with a fresh document set and 64 output tokens |
+| `mixed` | 16 requests decode alone for 32 tokens, then 16 refilled documents arrive; the decode requests' token gaps show the stall |
+| `store-decode` / `store-prefill` | Step C's `decode-b32` / `prefill-b32` with unique prompts: no reuse, only store traffic |
+
+Prompts are random token ids. A one-time small fill-and-reload cycle runs first, so the Triton kernel's
+compilation stays out of the measurements. vLLM's own counters confirm every reuse run actually hit the CPU cache:
+32,768 external prefix-cache hits and 939.5 MB loaded = 32,768 tokens × 28 KiB.
+
+### Streams: transfer streams that overlap compute, still one compute stream
+
+- **Compute stays on the null stream in every config.** Streams created don't change (1649): native's transfer
+  streams come from PyTorch's existing 128-stream pool. Native's run had 33 active streams (up to 24 non-null
+  streams in one workload, one per transfer); simple's had 2 more than `prefix`.
+- **Transfers do overlap compute when there is compute to overlap**:
+
+| Workload | native: side-stream busy / overlapped with null-stream kernels | simple |
+|---|---|---|
+| `store-decode` | 47.7 ms / **94%** | 28.1 ms / 46% |
+| `store-prefill` | 75.0 ms / 79% | 21.7 ms / 20% |
+| `mixed` (loads during decode) | 47.2 ms / **87%** | 153.0 ms / 71% |
+| `reuse-prefill` (loads before the prefill that needs them) | 15.1 ms / 6% | 55.8 ms / 0% |
+
+  In `reuse-prefill` nothing else is running: each request's prefill waits for its own load, so the transfer
+  can't overlap anything.
+- **Loads on the SMs beat loads on the copy engine on GB10.** Native's Triton kernels moved the 939.5 MB in 15.1 ms
+  of busy time (~62 GB/s); simple's DMA took 55.3 ms (17 GB/s). Stores, both by `cuMemcpyBatchAsync`, ran at
+  10–12.5 GB/s (native) and 30–43 GB/s (simple) in the store-heavy workloads (`store-*`, `mixed`). All are batches of many small block copies, well below the
+  61 GB/s Step A measured for one 256 MB copy.
+- **Stream priority has nothing to act on in `simple`.** CUDA documents priorities for scheduling kernel blocks
+  (Step A 05); simple's low-priority streams carry only copies. Native's loads *are* kernels sharing the SMs, yet
+  they didn't slow decode visibly (below).
+
+### Performance
+
+| Workload | prefix (recompute) | offload-native | offload-simple | prefix-big (GPU hit) |
+|---|---|---|---|---|
+| `reuse-prefill` | 1475 ms | **152 ms** | **156 ms** | 65 ms |
+| `reuse-decode` | 3590 ms | **2435 ms** | **2358 ms** | 1263 ms* |
+| `mixed`: decode token gap after arrival, median / max | 18.0 / **348.7 ms** | 18.4 / 25.2 ms | 18.2 / 35.1 ms | 20.5 / 39.2 ms |
+| `mixed`: total | 6079 ms | 4975 ms | 4778 ms | 4664 ms |
+| `store-decode` (ms / step) | 30.32 | 30.67 (+1.2%) | 30.59 (+0.9%) | 22.81* |
+| `store-prefill` | 1405 ms | 1476 ms (+5.1%) | 1452 ms (+3.3%) | 1400 ms |
+
+\* Not comparable: `reuse-decode` (16 × 2144 tokens) and `store-decode` (32 × 640) need more than the small
+cache's 18.7k tokens, so the three small-cache configs can't run all requests at once. Compare those rows
+against `prefix`. Native's `store-decode` run even *loaded* 40 MB with no reuse in the workload, most likely
+preempted requests resuming from their CPU copies.
+
+- **Reloading beats recomputing by ~10×.** Re-prefilling 16 × 2048 evicted tokens takes 1475 ms; loading them
+  takes 152–156 ms.
+- **The remaining gap to a GPU hit is scheduling, not bandwidth.** The load kernels were busy for only 15 ms,
+  yet offload took ~90 ms longer than a GPU hit, spread over 15 (native) or 36 (simple) engine steps instead of 4,
+  with the GPU idle 13–23% of the window. A request whose blocks are loading waits until the load completes,
+  then is scheduled in a later step.
+- **Offload protects running decodes.** Recomputing the arriving documents stalls the other requests: one decode
+  token took 348.7 ms because a prefill chunk ran inside its step. With offload, the worst gap was 25–35 ms,
+  no worse than a GPU hit.
+- **Write-through stores cost 1–5%** when nothing is ever reused.
+- **Offload restores evicted prefixes, not capacity.** Running requests still need their KV on the GPU, so
+  `reuse-decode` stays far behind `prefix-big`.
+
+### Correctness: loaded KV is exact
+
+| Workload | prefix / offload-native / offload-simple vs reference (`prefix-big` with logprobs) |
+|---|---|
+| `reuse-prefill` | 16/16 identical, all configs |
+| `mixed` | 32/32 identical, all configs |
+| `reuse-decode` | 14–15/16: only requests 2 and 8 differ, at position 0, top-2 gap **0.0000** |
+
+- **The only differences are exact ties.** Requests 2 and 8 start with an exact tie, and even `prefix-big`'s own
+  measured pass flips them against its logprob pass. Once on the other branch, a second tie at position 3 of
+  request 8 also differs between configs. Everything else is bit-identical across all four configs.
+- **No timing race showed up.** A load racing the zeroing of its destination block, or a store reading KV before
+  compute wrote it, would give wrong output. That is [02's async-timing failure](../02-cuda-graph-numerical-errors/README.md#a-systematic-view)
+  at full scale. vLLM orders both with `wait_stream` / events, and no output differed outside ties.
+
+### Answer
+
+KV offload adds **transfer streams, not compute concurrency**. Unlike Step D's tiny draft-token copies, these
+transfers are large and do overlap decode compute (46–94% of their busy time). The win is not throughput but avoided recomputation:
+~10× faster reuse of evicted prefixes and no prefill stall for running requests, for 1–5% of store overhead.
+
+GB10 caveats:
+- "CPU" and "GPU" KV live in the same LPDDR5x, so offload adds no real memory capacity here. The mechanism is
+  measured faithfully; the capacity benefit would differ on a discrete GPU.
+- Over PCIe, native's SM-based loads would read host memory across the bus; the ranking of SM vs DMA loads
+  could differ.
+
+## 9. Next
 
 - [ ] Step A follow-up: zero-copy reads of `malloc`/pinned memory from a kernel on GB10, compared with copy-then-compute.
 - [x] Speculative decoding (Step D): only a draft-token copy stream, no compute concurrency.
-- [ ] KV-cache CPU offload (`kv_offloading_size`, `SimpleCPUOffloadConnector`): measure its copy streams, low priority and contention for GB10's single copy engine.
+- [x] KV-cache CPU offload (Step E): transfer streams that overlap compute, no compute concurrency.
+- [ ] Step E follow-ups: why stores via `cuMemcpyBatchAsync` reach only 10–43 GB/s; offload on a discrete GPU, where it adds real capacity.
 - [ ] Step D follow-ups: a draft model ~10× smaller than the target (or EAGLE heads) once graphed; the M=1 vs M=5 GEMM kernel choice on GB10 in isolation.
 - [ ] Optional: multi-stream inside one forward pass (e.g. overlapping an independent branch) to see when a second *compute* stream helps.
 - [ ] Multi-GPU (needs different hardware): NCCL communication streams, DBO `comm_stream`, `CUDA_DEVICE_MAX_CONNECTIONS=1` as used by Megatron.

@@ -1,0 +1,691 @@
+vllm 0.32.0 | torch 2.13.0+cu130 | CUDA 13.0 | NVIDIA GB10
+NVIDIA Nsight Systems version 2025.3.2.474-253236389321v0
+
+################ config=prefix ################
+CONFIG prefix: kv_cache_memory_bytes=536870912 kv_connector=None async_scheduling=True
+RESULT config=prefix workload=reuse-prefill requests=16 prompt=2080 output=1: 1475.0 ms | prefix_cache_queries=33280
+RESULT config=prefix workload=reuse-decode requests=16 prompt=2080 output=64: 3589.9 ms | prefix_cache_queries=33280
+RESULT config=prefix workload=mixed: 6079.1 ms; decode token gap before arrival median 16.0 ms, after arrival median 18.0 / max 348.7 ms | prefix_cache_queries=41472
+RESULT config=prefix workload=store-decode requests=32 prompt=512 output=128: 3881.0 ms, 30.32 ms per output step | prefix_cache_queries=16384
+RESULT config=prefix workload=store-prefill requests=32 prompt=1024 output=1: 1405.0 ms, 1404.98 ms per output step | prefix_cache_queries=32768
+[process 34840 VLLM::EngineCor] null stream id = 7
+  [created] 1649 streams, by priority: {-5: 1, -3: 32, -2: 32, -1: 32, 0: 1552}; stream-create / graph-instantiate calls: {'cudaStreamCreateWithPriority_v5050': 128, 'cudaGraphInstantiateWithFlags_v11040': 1514}
+  [active]  4 streams received work during the whole run: [7, 13, 21, 25]
+
+[measured:reuse-prefill] wall 1475.1 ms, GPU busy 1457.0 ms (99%), 1855 GPU ops, 8 model steps
+
+  phase=all: 2 stream(s) with work, 227 kernels/step, GPU kernel time 182.14 ms/step
+  wall 184.38 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.01 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0     1815       225      28       0   1457.05 100.0% (null)
+        13     0        0         0      12       0      0.04   0.0%
+
+  non-null streams: busy time overlapping null-stream kernels; copies
+  all 1 non-null streams (pid 34840): busy 0.04 ms, overlapped 0.01 ms (37%)
+  D2H copies on non-null streams (pid 34840): 0.0 MB in 0.04 ms of copy time (0.0 GB/s)
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     34840      7     Host-to-Device       Pinned->Device       1028 B: 6
+     34840      7     Host-to-Device       Pinned->Device         16 B: 6
+     34840      7     Host-to-Device       Pinned->Device         32 B: 4
+     34840      7     Host-to-Device       Pinned->Device       2048 B: 3
+     34840     13     Device-to-Host       Device->Pinned         32 B: 3
+     34840     13     Device-to-Host       Device->Pinned         16 B: 3
+     34840      7     Host-to-Device       Pinned->Device          4 B: 2
+     34840      7     Host-to-Device       Pinned->Device          8 B: 2
+     34840     13     Device-to-Host       Device->Pinned          8 B: 2
+     34840     13     Device-to-Host       Device->Pinned          4 B: 2
+     34840      7     Host-to-Device       Pinned->Device         12 B: 2
+     34840      7     Host-to-Device       Pinned->Device        520 B: 1
+
+[measured:reuse-decode] wall 3590.0 ms, GPU busy 3564.4 ms (99%), 50273 GPU ops, 132 model steps
+
+  phase=all: 2 stream(s) with work, 376 kernels/step, GPU kernel time 27.02 ms/step
+  wall 27.20 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.01 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0    49588     45850     423       0   3565.81 100.0% (null)
+        13     0        0         0     262       0      0.74   0.0%
+
+  non-null streams: busy time overlapping null-stream kernels; copies
+  all 1 non-null streams (pid 34840): busy 0.74 ms, overlapped 0.24 ms (33%)
+  D2H copies on non-null streams (pid 34840): 0.0 MB in 0.74 ms of copy time (0.0 GB/s)
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     34840      7     Host-to-Device       Pinned->Device       1028 B: 131
+     34840     13     Device-to-Host       Device->Pinned         32 B: 127
+     34840      7     Host-to-Device       Pinned->Device         64 B: 125
+     34840     13     Device-to-Host       Device->Pinned         64 B: 125
+     34840      7   Device-to-Device       Device->Device       6144 B: 125
+     34840      7     Host-to-Device       Pinned->Device         12 B: 11
+     34840      7     Host-to-Device       Pinned->Device         16 B: 10
+     34840      7     Host-to-Device       Pinned->Device          4 B: 6
+     34840      7     Host-to-Device       Pinned->Device          8 B: 4
+     34840     13     Device-to-Host       Device->Pinned         16 B: 3
+     34840      7     Host-to-Device       Pinned->Device         32 B: 2
+     34840      7     Host-to-Device       Pinned->Device       2060 B: 2
+
+[measured:mixed] wall 6079.2 ms, GPU busy 6006.5 ms (99%), 107479 GPU ops, 259 model steps
+
+  phase=all: 2 stream(s) with work, 376 kernels/step, GPU kernel time 23.20 ms/step
+  wall 23.47 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.02 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0    97504     90015     837    8624   6008.04 100.0% (null)
+        13     0        0         0     514       0      1.40   0.0%
+
+  non-null streams: busy time overlapping null-stream kernels; copies
+  all 1 non-null streams (pid 34840): busy 1.40 ms, overlapped 0.60 ms (43%)
+  D2H copies on non-null streams (pid 34840): 0.1 MB in 1.40 ms of copy time (0.0 GB/s)
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     34840      7     Host-to-Device       Pinned->Device       1028 B: 257
+     34840      7   Device-to-Device       Device->Device       6144 B: 154
+     34840      7     Host-to-Device       Pinned->Device        128 B: 92
+     34840     13     Device-to-Host       Device->Pinned        128 B: 92
+     34840     13     Device-to-Host       Device->Pinned         64 B: 92
+     34840      7   Device-to-Device       Device->Device      12288 B: 92
+     34840      7     Host-to-Device       Pinned->Device        160 B: 90
+     34840     13     Device-to-Host       Device->Pinned        160 B: 90
+     34840     13     Device-to-Host       Device->Pinned         80 B: 90
+     34840      7     Host-to-Device       Pinned->Device        152 B: 37
+     34840     13     Device-to-Host       Device->Pinned        152 B: 37
+     34840     13     Device-to-Host       Device->Pinned         76 B: 37
+
+[measured:store-decode] wall 3881.0 ms, GPU busy 3826.6 ms (99%), 81072 GPU ops, 194 model steps
+
+  phase=all: 2 stream(s) with work, 374 kernels/step, GPU kernel time 19.73 ms/step
+  wall 20.01 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.02 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0    72573     68258    1085    7028   3827.67 100.0% (null)
+        13     0        0         0     386       0      0.33   0.0%
+
+  non-null streams: busy time overlapping null-stream kernels; copies
+  all 1 non-null streams (pid 34840): busy 0.33 ms, overlapped 0.18 ms (55%)
+  D2H copies on non-null streams (pid 34840): 0.0 MB in 0.33 ms of copy time (0.2 GB/s)
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     34840      7   Device-to-Device       Device->Device       3072 B: 493
+     34840      7     Host-to-Device       Pinned->Device       1028 B: 193
+     34840      7   Device-to-Device       Device->Device      98304 B: 125
+     34840     13     Device-to-Host       Device->Pinned        128 B: 66
+     34840      7     Host-to-Device       Pinned->Device        256 B: 65
+     34840     13     Device-to-Host       Device->Pinned        256 B: 65
+     34840     13     Device-to-Host       Device->Pinned          8 B: 33
+     34840      7   Device-to-Device       Device->Device      12288 B: 31
+     34840      7     Host-to-Device       Pinned->Device         24 B: 31
+     34840     13     Device-to-Host       Device->Pinned         24 B: 31
+     34840     13     Device-to-Host       Device->Pinned         12 B: 31
+     34840      7     Host-to-Device       Pinned->Device        232 B: 30
+
+[measured:store-prefill] wall 1405.0 ms, GPU busy 1389.5 ms (99%), 1550 GPU ops, 7 model steps
+
+  phase=all: 2 stream(s) with work, 216 kernels/step, GPU kernel time 198.52 ms/step
+  wall 200.71 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.01 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0     1515         0      25       0   1389.59 100.0% (null)
+        13     0        0         0      10       0      0.03   0.0%
+
+  non-null streams: busy time overlapping null-stream kernels; copies
+  all 1 non-null streams (pid 34840): busy 0.03 ms, overlapped 0.01 ms (25%)
+  D2H copies on non-null streams (pid 34840): 0.0 MB in 0.03 ms of copy time (0.0 GB/s)
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     34840      7     Host-to-Device       Pinned->Device         32 B: 8
+     34840      7     Host-to-Device       Pinned->Device       1028 B: 5
+     34840     13     Device-to-Host       Device->Pinned         32 B: 5
+     34840      7     Host-to-Device       Pinned->Device         16 B: 4
+     34840      7     Host-to-Device       Pinned->Device       2048 B: 3
+     34840      7     Host-to-Device       Pinned->Device         64 B: 3
+     34840     13     Device-to-Host       Device->Pinned         64 B: 3
+     34840      7     Host-to-Device       Pinned->Device       1024 B: 2
+     34840     13     Device-to-Host       Device->Pinned         16 B: 2
+
+################ config=prefix-big ################
+CONFIG prefix-big: kv_cache_memory_bytes=8589934592 kv_connector=None async_scheduling=True
+RESULT config=prefix-big workload=reuse-prefill requests=16 prompt=2080 output=1: 64.7 ms | prefix_cache_hits=32768 prefix_cache_queries=33280
+RESULT config=prefix-big workload=reuse-decode requests=16 prompt=2080 output=64: 1262.8 ms | prefix_cache_hits=32768 prefix_cache_queries=33280
+RESULT config=prefix-big workload=mixed: 4664.0 ms; decode token gap before arrival median 16.5 ms, after arrival median 20.5 / max 39.2 ms | prefix_cache_hits=32768 prefix_cache_queries=41472
+RESULT config=prefix-big workload=store-decode requests=32 prompt=512 output=128: 2920.3 ms, 22.81 ms per output step | prefix_cache_queries=16384
+RESULT config=prefix-big workload=store-prefill requests=32 prompt=1024 output=1: 1400.3 ms, 1400.34 ms per output step | prefix_cache_queries=32768
+[process 35378 python] null stream id = 7
+  [created] 1649 streams, by priority: {-5: 1, -3: 32, -2: 32, -1: 32, 0: 1552}; stream-create / graph-instantiate calls: {'cudaStreamCreateWithPriority_v5050': 128, 'cudaGraphInstantiateWithFlags_v11040': 1514}
+  [active]  4 streams received work during the whole run: [7, 13, 21, 25]
+
+[measured:reuse-prefill] wall 64.7 ms, GPU busy 52.0 ms (80%), 676 GPU ops, 4 model steps
+
+  phase=all: 2 stream(s) with work, 152 kernels/step, GPU kernel time 13.01 ms/step
+  wall 16.18 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.00 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0      606       450      10      56     52.02 100.0% (null)
+        13     0        0         0       4       0      0.01   0.0%
+
+  non-null streams: busy time overlapping null-stream kernels; copies
+  all 1 non-null streams (pid 35378): busy 0.01 ms, overlapped 0.00 ms (35%)
+  D2H copies on non-null streams (pid 35378): 0.0 MB in 0.01 ms of copy time (0.0 GB/s)
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     35378      7     Host-to-Device       Pinned->Device         60 B: 2
+     35378      7     Host-to-Device       Pinned->Device       1028 B: 2
+     35378      7     Host-to-Device       Pinned->Device          4 B: 2
+     35378      7     Host-to-Device       Pinned->Device       7800 B: 1
+     35378      7     Host-to-Device       Pinned->Device        120 B: 1
+     35378     13     Device-to-Host       Device->Pinned        120 B: 1
+     35378     13     Device-to-Host       Device->Pinned         60 B: 1
+     35378      7     Host-to-Device       Pinned->Device        520 B: 1
+     35378      7     Host-to-Device       Pinned->Device          8 B: 1
+     35378     13     Device-to-Host       Device->Pinned          8 B: 1
+     35378     13     Device-to-Host       Device->Pinned          4 B: 1
+
+[measured:reuse-decode] wall 1262.8 ms, GPU busy 1248.8 ms (99%), 25073 GPU ops, 66 model steps
+
+  phase=all: 2 stream(s) with work, 374 kernels/step, GPU kernel time 18.95 ms/step
+  wall 19.13 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.01 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0    24681     23445     206      56   1250.05 100.0% (null)
+        13     0        0         0     130       0      0.35   0.0%
+
+  non-null streams: busy time overlapping null-stream kernels; copies
+  all 1 non-null streams (pid 35378): busy 0.35 ms, overlapped 0.13 ms (38%)
+  D2H copies on non-null streams (pid 35378): 0.0 MB in 0.35 ms of copy time (0.0 GB/s)
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     35378      7     Host-to-Device       Pinned->Device       1028 B: 65
+     35378      7     Host-to-Device       Pinned->Device        128 B: 63
+     35378     13     Device-to-Host       Device->Pinned        128 B: 63
+     35378     13     Device-to-Host       Device->Pinned         64 B: 63
+     35378      7   Device-to-Device       Device->Device      12288 B: 63
+     35378      7     Host-to-Device       Pinned->Device         52 B: 6
+     35378      7     Host-to-Device       Pinned->Device         12 B: 5
+     35378      7     Host-to-Device       Pinned->Device       1560 B: 1
+     35378      7     Host-to-Device       Pinned->Device         24 B: 1
+     35378     13     Device-to-Host       Device->Pinned         24 B: 1
+     35378     13     Device-to-Host       Device->Pinned         12 B: 1
+     35378      7     Host-to-Device       Pinned->Device       6772 B: 1
+
+[measured:mixed] wall 4664.0 ms, GPU busy 4627.1 ms (99%), 101031 GPU ops, 258 model steps
+
+  phase=all: 2 stream(s) with work, 380 kernels/step, GPU kernel time 17.95 ms/step
+  wall 18.08 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.02 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0    97971     92935     810    1736   4629.74 100.0% (null)
+        13     0        0         0     514       0      1.41   0.0%
+
+  non-null streams: busy time overlapping null-stream kernels; copies
+  all 1 non-null streams (pid 35378): busy 1.41 ms, overlapped 0.51 ms (36%)
+  D2H copies on non-null streams (pid 35378): 0.1 MB in 1.41 ms of copy time (0.0 GB/s)
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     35378      7     Host-to-Device       Pinned->Device       1028 B: 257
+     35378     13     Device-to-Host       Device->Pinned        128 B: 255
+     35378      7     Host-to-Device       Pinned->Device        128 B: 224
+     35378     13     Device-to-Host       Device->Pinned         64 B: 223
+     35378      7   Device-to-Device       Device->Device      12288 B: 223
+     35378      7     Host-to-Device       Pinned->Device        256 B: 32
+     35378     13     Device-to-Host       Device->Pinned        256 B: 32
+     35378      7   Device-to-Device       Device->Device      98304 B: 31
+     35378      7     Host-to-Device       Pinned->Device         60 B: 18
+     35378      7     Host-to-Device       Pinned->Device          4 B: 17
+     35378      7     Host-to-Device       Pinned->Device         64 B: 4
+     35378      7     Host-to-Device       Pinned->Device          8 B: 1
+
+[measured:store-decode] wall 2920.3 ms, GPU busy 2870.9 ms (98%), 57181 GPU ops, 132 model steps
+
+  phase=all: 2 stream(s) with work, 375 kernels/step, GPU kernel time 21.76 ms/step
+  wall 22.12 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.02 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0    49447     46355     418    7056   2871.25 100.0% (null)
+        13     0        0         0     260       0      0.55   0.0%
+
+  non-null streams: busy time overlapping null-stream kernels; copies
+  all 1 non-null streams (pid 35378): busy 0.55 ms, overlapped 0.26 ms (47%)
+  D2H copies on non-null streams (pid 35378): 0.0 MB in 0.55 ms of copy time (0.1 GB/s)
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     35378      7     Host-to-Device       Pinned->Device       1028 B: 130
+     35378      7     Host-to-Device       Pinned->Device        256 B: 126
+     35378     13     Device-to-Host       Device->Pinned        256 B: 126
+     35378     13     Device-to-Host       Device->Pinned        128 B: 126
+     35378      7   Device-to-Device       Device->Device      98304 B: 126
+     35378      7     Host-to-Device       Pinned->Device         16 B: 9
+     35378      7     Host-to-Device       Pinned->Device         52 B: 8
+     35378      7     Host-to-Device       Pinned->Device         60 B: 7
+     35378      7     Host-to-Device       Pinned->Device         64 B: 2
+     35378      7     Host-to-Device       Pinned->Device         48 B: 2
+     35378      7     Host-to-Device       Pinned->Device        512 B: 1
+     35378      7     Host-to-Device       Pinned->Device         32 B: 1
+
+[measured:store-prefill] wall 1400.4 ms, GPU busy 1384.4 ms (99%), 1550 GPU ops, 7 model steps
+
+  phase=all: 2 stream(s) with work, 216 kernels/step, GPU kernel time 197.77 ms/step
+  wall 200.05 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.01 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0     1515         0      25       0   1384.39 100.0% (null)
+        13     0        0         0      10       0      0.03   0.0%
+
+  non-null streams: busy time overlapping null-stream kernels; copies
+  all 1 non-null streams (pid 35378): busy 0.03 ms, overlapped 0.01 ms (28%)
+  D2H copies on non-null streams (pid 35378): 0.0 MB in 0.03 ms of copy time (0.0 GB/s)
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     35378      7     Host-to-Device       Pinned->Device         32 B: 6
+     35378      7     Host-to-Device       Pinned->Device       1028 B: 5
+     35378      7     Host-to-Device       Pinned->Device       2048 B: 3
+     35378      7     Host-to-Device       Pinned->Device         64 B: 3
+     35378     13     Device-to-Host       Device->Pinned         64 B: 3
+     35378     13     Device-to-Host       Device->Pinned         32 B: 3
+     35378      7     Host-to-Device       Pinned->Device         12 B: 2
+     35378      7     Host-to-Device       Pinned->Device         20 B: 2
+     35378      7     Host-to-Device       Pinned->Device        768 B: 1
+     35378      7     Host-to-Device       Pinned->Device         24 B: 1
+     35378     13     Device-to-Host       Device->Pinned         24 B: 1
+     35378     13     Device-to-Host       Device->Pinned         12 B: 1
+
+################ config=offload-native ################
+CONFIG offload-native: kv_cache_memory_bytes=536870912 kv_connector=OffloadingConnector async_scheduling=True
+RESULT config=offload-native workload=reuse-prefill requests=16 prompt=2080 output=1: 152.2 ms | external_prefix_cache_hits=32768 external_prefix_cache_queries=33280 kv_offload_cpu_allocation_size=32 kv_offload_cpu_cache_usage_perc=-0.05416 kv_offload_cpu_cache_write_usage_perc=-0.05416 kv_offload_load_bytes=939524096 kv_offload_load_size=939524096 kv_offload_lookup_sync_delay_seconds=0.001039 kv_offload_size=1419378688 kv_offload_store_bytes=479854592 kv_offload_store_size=479854592 kv_offload_total_bytes=1419378688 prefix_cache_queries=33280
+RESULT config=offload-native workload=reuse-decode requests=16 prompt=2080 output=64: 2435.3 ms | external_prefix_cache_hits=32768 external_prefix_cache_queries=33280 kv_offload_cpu_allocation_size=32 kv_offload_cpu_cache_usage_perc=-0.04102 kv_offload_cpu_cache_write_usage_perc=-0.04102 kv_offload_load_bytes=954662912 kv_offload_load_size=954662912 kv_offload_lookup_sync_delay_seconds=0.004822 kv_offload_size=1321664512 kv_offload_store_bytes=367001600 kv_offload_store_size=367001600 kv_offload_total_bytes=1321664512 prefix_cache_queries=33280
+RESULT config=offload-native workload=mixed: 4975.4 ms; decode token gap before arrival median 16.0 ms, after arrival median 18.4 / max 25.2 ms | external_prefix_cache_hits=32768 external_prefix_cache_queries=41472 kv_offload_cpu_allocation_size=544 kv_offload_cpu_cache_usage_perc=-0.04102 kv_offload_cpu_cache_write_usage_perc=-0.04102 kv_offload_load_bytes=951910400 kv_offload_load_size=951910400 kv_offload_lookup_sync_delay_seconds=0.02125 kv_offload_size=1553793024 kv_offload_store_bytes=601882624 kv_offload_store_size=601882624 kv_offload_total_bytes=1553793024 prefix_cache_queries=41472
+RESULT config=offload-native workload=store-decode requests=32 prompt=512 output=128: 3926.3 ms, 30.67 ms per output step | external_prefix_cache_queries=16384 kv_offload_cpu_allocation_size=1024 kv_offload_load_bytes=39911424 kv_offload_load_size=39911424 kv_offload_lookup_sync_delay_seconds=0.002223 kv_offload_size=509673472 kv_offload_store_bytes=469762048 kv_offload_store_size=469762048 kv_offload_total_bytes=509673472 prefix_cache_queries=16384
+RESULT config=offload-native workload=store-prefill requests=32 prompt=1024 output=1: 1476.4 ms, 1476.39 ms per output step | external_prefix_cache_queries=32768 kv_offload_cpu_allocation_size=2048 kv_offload_cpu_cache_usage_perc=-0.02051 kv_offload_cpu_cache_write_usage_perc=-0.02051 kv_offload_lookup_sync_delay_seconds=0.000126 kv_offload_size=1115684864 kv_offload_store_bytes=1115684864 kv_offload_store_size=1115684864 kv_offload_total_bytes=1115684864 prefix_cache_queries=32768
+[process 35802 VLLM::EngineCor] null stream id = 7
+  [created] 1649 streams, by priority: {-5: 1, -3: 32, -2: 32, -1: 32, 0: 1552}; stream-create / graph-instantiate calls: {'cudaStreamCreateWithPriority_v5050': 128, 'cudaGraphInstantiateWithFlags_v11040': 1514}
+  [active]  33 streams received work during the whole run: [7, 13, 17, 21, 25, 29, 33, 37, 41, 45, 49, 53, 57, 61, 65, 69, 73, 77, 81, 85, 89, 93, 97, 101, 105, 109, 113, 117, 121, 125, 129, 133, 137]
+
+[measured:reuse-prefill] wall 152.2 ms, GPU busy 131.7 ms (87%), 2164 GPU ops, 15 model steps
+
+  phase=all: 19 stream(s) with work, 122 kernels/step, GPU kernel time 8.86 ms/step
+  wall 10.15 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.00 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0     1818      1350      30     224    117.62  88.5% (null)
+        93     0        2         0       6       0      1.80   1.4%
+        89     0        2         0       6       0      1.78   1.3%
+        81     0        2         0       6       0      1.76   1.3%
+        85     0        2         0       6       0      1.74   1.3%
+        69     0        2         0       6       0      1.72   1.3%
+        77     0        2         0       6       0      1.71   1.3%
+        73     0        2         0       6       0      1.69   1.3%
+        61     0        1         0       3       0      0.88   0.7%
+        65     0        1         0       3       0      0.82   0.6%
+        57     0        0         0       4       0      0.32   0.2%
+        41     0        0         0       3       0      0.23   0.2%
+        37     0        0         0       2       0      0.23   0.2%
+        33     0        0         0       2       0      0.15   0.1%
+        53     0        0         0       2       0      0.15   0.1%
+        29     0        0         0       1       0      0.07   0.1%
+        45     0        0         0       1       0      0.07   0.1%
+        49     0        0         0       1       0      0.06   0.0%
+        13     0        0         0      12       0      0.04   0.0%
+
+  non-null streams: busy time overlapping null-stream kernels; copies
+  all 18 non-null streams (pid 35802): busy 15.11 ms, overlapped 0.97 ms (6%)
+  D2H copies on non-null streams (pid 35802): 14.7 MB in 1.33 ms of copy time (11.1 GB/s)
+  H2D copies on non-null streams (pid 35802): 1.4 MB in 0.16 ms of copy time (8.5 GB/s)
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     35802     69     Host-to-Device       Pinned->Device      28672 B: 6
+     35802     73     Host-to-Device       Pinned->Device      28672 B: 6
+     35802     77     Host-to-Device       Pinned->Device      28672 B: 6
+     35802     81     Host-to-Device       Pinned->Device      28672 B: 6
+     35802     85     Host-to-Device       Pinned->Device      28672 B: 6
+     35802     89     Host-to-Device       Pinned->Device      28672 B: 6
+     35802     93     Host-to-Device       Pinned->Device      28672 B: 6
+     35802      7     Host-to-Device       Pinned->Device       1028 B: 6
+     35802      7     Host-to-Device       Pinned->Device          8 B: 5
+     35802      7     Host-to-Device       Pinned->Device         12 B: 4
+     35802     57     Device-to-Host       Device->Pinned     917504 B: 4
+     35802     65     Host-to-Device       Pinned->Device      28672 B: 3
+
+[measured:reuse-decode] wall 2435.3 ms, GPU busy 2363.8 ms (97%), 53685 GPU ops, 142 model steps
+
+  phase=all: 16 stream(s) with work, 370 kernels/step, GPU kernel time 16.71 ms/step
+  wall 17.15 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.01 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0    52523     49615     464     336   2352.39  99.1% (null)
+        65     0        4         0      12       0      4.17   0.2%
+        89     0        3         0       9       0      4.03   0.2%
+        93     0        3         0       9       0      3.70   0.2%
+        61     0        2         0       6       0      1.68   0.1%
+        85     0        1         0       3       0      0.88   0.0%
+        13     0        0         0     278       0      0.85   0.0%
+        81     0        1         0       3       0      0.85   0.0%
+        69     0        1         0       3       0      0.83   0.0%
+        77     0        1         0       3       0      0.83   0.0%
+        73     0        1         0       3       0      0.81   0.0%
+        37     0        0         0       5       0      0.63   0.0%
+        53     0        0         0       5       0      0.53   0.0%
+        41     0        0         0       4       0      0.44   0.0%
+        49     0        0         0       1       0      0.12   0.0%
+        45     0        0         0       1       0      0.08   0.0%
+
+  non-null streams: busy time overlapping null-stream kernels; copies
+  all 15 non-null streams (pid 35802): busy 20.14 ms, overlapped 7.80 ms (39%)
+  D2H copies on non-null streams (pid 35802): 14.7 MB in 2.65 ms of copy time (5.5 GB/s)
+  H2D copies on non-null streams (pid 35802): 1.4 MB in 0.20 ms of copy time (7.1 GB/s)
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     35802      7     Host-to-Device       Pinned->Device       1028 B: 139
+     35802      7   Device-to-Device       Device->Device       6144 B: 123
+     35802     13     Device-to-Host       Device->Pinned         32 B: 115
+     35802      7     Host-to-Device       Pinned->Device         64 B: 114
+     35802     13     Device-to-Host       Device->Pinned         64 B: 114
+     35802      7     Host-to-Device       Pinned->Device          8 B: 23
+     35802      7     Host-to-Device       Pinned->Device          4 B: 12
+     35802      7     Host-to-Device       Pinned->Device         12 B: 11
+     35802     13     Device-to-Host       Device->Pinned         24 B: 11
+     35802      7     Host-to-Device       Pinned->Device         40 B: 10
+     35802     13     Device-to-Host       Device->Pinned         40 B: 10
+     35802     13     Device-to-Host       Device->Pinned         20 B: 10
+
+[measured:mixed] wall 4975.4 ms, GPU busy 4904.7 ms (99%), 108511 GPU ops, 259 model steps
+
+  phase=all: 21 stream(s) with work, 378 kernels/step, GPU kernel time 19.10 ms/step
+  wall 19.21 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.02 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0    97980     92545     843    9072   4900.48  99.0% (null)
+        65     0        6         0      18       0     10.00   0.2%
+        89     0        4         0      12       0      6.77   0.1%
+        61     0        4         0      12       0      5.39   0.1%
+        93     0        3         0       9       0      4.19   0.1%
+        33     0        0         0       2       0      2.26   0.0%
+       109     0        0         0       8       0      2.08   0.0%
+       121     0        0         0       4       0      1.96   0.0%
+       113     0        0         0       4       0      1.43   0.0%
+       117     0        0         0       4       0      1.43   0.0%
+        13     0        0         0     516       0      1.29   0.0%
+       105     0        0         0       1       0      1.24   0.0%
+        37     0        0         0       1       0      1.16   0.0%
+        41     0        0         0       1       0      1.16   0.0%
+        45     0        0         0       1       0      1.15   0.0%
+        53     0        0         0       1       0      1.05   0.0%
+        97     0        0         0       1       0      0.97   0.0%
+       101     0        0         0       1       0      0.96   0.0%
+        57     0        0         0       1       0      0.92   0.0%
+        49     0        0         0       1       0      0.92   0.0%
+        29     0        0         0       1       0      0.88   0.0%
+
+  non-null streams: busy time overlapping null-stream kernels; copies
+  all 20 non-null streams (pid 35802): busy 47.19 ms, overlapped 40.92 ms (87%)
+  D2H copies on non-null streams (pid 35802): 249.6 MB in 20.84 ms of copy time (12.0 GB/s)
+  H2D copies on non-null streams (pid 35802): 1.4 MB in 0.23 ms of copy time (6.2 GB/s)
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     35802      7     Host-to-Device       Pinned->Device       1028 B: 258
+     35802      7   Device-to-Device       Device->Device       6144 B: 159
+     35802      7     Host-to-Device       Pinned->Device        128 B: 89
+     35802      7   Device-to-Device       Device->Device      12288 B: 89
+     35802     13     Device-to-Host       Device->Pinned        128 B: 88
+     35802     13     Device-to-Host       Device->Pinned         64 B: 88
+     35802      7     Host-to-Device       Pinned->Device        160 B: 80
+     35802     13     Device-to-Host       Device->Pinned        160 B: 80
+     35802     13     Device-to-Host       Device->Pinned         80 B: 80
+     35802      7     Host-to-Device       Pinned->Device        152 B: 41
+     35802     13     Device-to-Host       Device->Pinned        152 B: 41
+     35802     13     Device-to-Host       Device->Pinned         76 B: 41
+
+[measured:store-decode] wall 3926.3 ms, GPU busy 3864.2 ms (98%), 82336 GPU ops, 198 model steps
+
+  phase=all: 25 stream(s) with work, 372 kernels/step, GPU kernel time 19.75 ms/step
+  wall 19.83 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.02 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0    73736     69353    1107    7056   3862.65  98.8% (null)
+        57     0        0         0       3       0      5.51   0.1%
+        49     0        0         0       3       0      5.26   0.1%
+        53     0        0         0       3       0      4.45   0.1%
+        41     0        0         0       2       0      3.32   0.1%
+        37     0        0         0       2       0      3.16   0.1%
+        29     0        0         0       2       0      2.79   0.1%
+        45     0        0         0       3       0      2.62   0.1%
+        97     0        0         0       1       0      2.23   0.1%
+        33     0        0         0       2       0      2.04   0.1%
+       101     0        0         0       1       0      1.96   0.1%
+        17     0        0         0       1       0      1.80   0.0%
+        13     0        0         0     393       0      1.46   0.0%
+       137     0        0         0       1       0      1.44   0.0%
+       129     0        0         0       1       0      1.36   0.0%
+       125     0        0         0       1       0      1.31   0.0%
+       133     0        0         0       1       0      1.21   0.0%
+       105     0        0         0       1       0      1.21   0.0%
+        21     0        0         0       1       0      1.15   0.0%
+        25     0        0         0       1       0      1.01   0.0%
+       121     0        0         0       1       0      0.76   0.0%
+       117     0        0         0       1       0      0.76   0.0%
+        65     0        1         0       3       0      0.51   0.0%
+        89     0        1         0       3       0      0.21   0.0%
+        61     0        1         0       3       0      0.14   0.0%
+
+  non-null streams: busy time overlapping null-stream kernels; copies
+  all 24 non-null streams (pid 35802): busy 47.67 ms, overlapped 44.72 ms (94%)
+  D2H copies on non-null streams (pid 35802): 469.8 MB in 46.81 ms of copy time (10.0 GB/s)
+  H2D copies on non-null streams (pid 35802): 0.1 MB in 0.02 ms of copy time (3.5 GB/s)
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     35802      7   Device-to-Device       Device->Device       3072 B: 493
+     35802      7     Host-to-Device       Pinned->Device       1028 B: 196
+     35802      7   Device-to-Device       Device->Device      98304 B: 124
+     35802      7     Host-to-Device       Pinned->Device        256 B: 64
+     35802     13     Device-to-Host       Device->Pinned        256 B: 64
+     35802     13     Device-to-Host       Device->Pinned        128 B: 64
+     35802     13     Device-to-Host       Device->Pinned          8 B: 33
+     35802      7   Device-to-Device       Device->Device      12288 B: 32
+     35802      7     Host-to-Device       Pinned->Device         24 B: 31
+     35802     13     Device-to-Host       Device->Pinned         24 B: 31
+     35802     13     Device-to-Host       Device->Pinned         12 B: 31
+     35802      7     Host-to-Device       Pinned->Device        232 B: 27
+
+[measured:store-prefill] wall 1476.4 ms, GPU busy 1463.9 ms (99%), 1582 GPU ops, 8 model steps
+
+  phase=all: 14 stream(s) with work, 189 kernels/step, GPU kernel time 190.41 ms/step
+  wall 184.55 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.01 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0     1515         0      25       0   1448.36  95.1% (null)
+        57     0        0         0       4       0     11.77   0.8%
+        45     0        0         0       6       0     11.11   0.7%
+        53     0        0         0       4       0     10.50   0.7%
+        49     0        0         0       5       0     10.35   0.7%
+        29     0        0         0       2       0      6.27   0.4%
+       105     0        0         0       2       0      4.86   0.3%
+       101     0        0         0       2       0      4.75   0.3%
+       121     0        0         0       2       0      4.26   0.3%
+       117     0        0         0       2       0      3.72   0.2%
+        97     0        0         0       1       0      2.55   0.2%
+        37     0        0         0       1       0      2.52   0.2%
+        41     0        0         0       1       0      2.26   0.1%
+        13     0        0         0      10       0      0.03   0.0%
+
+  non-null streams: busy time overlapping null-stream kernels; copies
+  all 13 non-null streams (pid 35802): busy 74.96 ms, overlapped 59.31 ms (79%)
+  D2H copies on non-null streams (pid 35802): 939.5 MB in 74.96 ms of copy time (12.5 GB/s)
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     35802      7     Host-to-Device       Pinned->Device         32 B: 6
+     35802     45     Device-to-Host       Device->Pinned   29360128 B: 6
+     35802      7     Host-to-Device       Pinned->Device       1028 B: 5
+     35802     49     Device-to-Host       Device->Pinned   29360128 B: 5
+     35802     57     Device-to-Host       Device->Pinned   29360128 B: 4
+     35802     53     Device-to-Host       Device->Pinned   29360128 B: 4
+     35802      7     Host-to-Device       Pinned->Device       2048 B: 3
+     35802      7     Host-to-Device       Pinned->Device         64 B: 3
+     35802     13     Device-to-Host       Device->Pinned         64 B: 3
+     35802     13     Device-to-Host       Device->Pinned         32 B: 3
+     35802      7     Host-to-Device       Pinned->Device         20 B: 2
+     35802     29     Device-to-Host       Device->Pinned   29360128 B: 2
+
+################ config=offload-simple ################
+CONFIG offload-simple: kv_cache_memory_bytes=536870912 kv_connector=SimpleCPUOffloadConnector async_scheduling=True
+RESULT config=offload-simple workload=reuse-prefill requests=16 prompt=2080 output=1: 156.1 ms | external_prefix_cache_hits=32768 external_prefix_cache_queries=33280 prefix_cache_queries=33280 simple_kv_offload_load_blocks=2048 simple_kv_offload_pending_store_blocks=-626 simple_kv_offload_used_blocks=-626
+RESULT config=offload-simple workload=reuse-decode requests=16 prompt=2080 output=64: 2357.7 ms | external_prefix_cache_hits=32768 external_prefix_cache_queries=33280 prefix_cache_queries=33280 simple_kv_offload_load_blocks=2079 simple_kv_offload_pending_store_blocks=-640 simple_kv_offload_used_blocks=-640
+RESULT config=offload-simple workload=mixed: 4778.3 ms; decode token gap before arrival median 16.0 ms, after arrival median 18.2 / max 35.1 ms | external_prefix_cache_hits=32768 external_prefix_cache_queries=41472 prefix_cache_queries=41472 simple_kv_offload_load_blocks=2063 simple_kv_offload_pending_store_blocks=-640 simple_kv_offload_used_blocks=-640
+RESULT config=offload-simple workload=store-decode requests=32 prompt=512 output=128: 3915.5 ms, 30.59 ms per output step | external_prefix_cache_queries=16384 prefix_cache_queries=16384 simple_kv_offload_load_blocks=99
+RESULT config=offload-simple workload=store-prefill requests=32 prompt=1024 output=1: 1451.6 ms, 1451.63 ms per output step | external_prefix_cache_queries=32768 prefix_cache_queries=32768
+[process 36225 VLLM::EngineCor] null stream id = 7
+  [created] 1649 streams, by priority: {-5: 1, -3: 32, -2: 32, -1: 32, 0: 1552}; stream-create / graph-instantiate calls: {'cudaStreamCreateWithPriority_v5050': 128, 'cudaGraphInstantiateWithFlags_v11040': 1514}
+  [active]  6 streams received work during the whole run: [7, 13, 21, 25, 29, 33]
+
+[measured:reuse-prefill] wall 156.1 ms, GPU busy 120.8 ms (77%), 1021 GPU ops, 36 model steps
+
+  phase=all: 4 stream(s) with work, 26 kernels/step, GPU kernel time 3.36 ms/step
+  wall 4.34 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.00 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0      937       703      15      56     65.09  53.9% (null)
+        25     0        0         0       4       0     55.30  45.8%
+        29     0        0         0       3       0      0.45   0.4%
+        13     0        0         0       6       0      0.02   0.0%
+
+  non-null streams: busy time overlapping null-stream kernels; copies
+  all 3 non-null streams (pid 36225): busy 55.77 ms, overlapped 0.01 ms (0%)
+  D2H copies on non-null streams (pid 36225): 14.7 MB in 0.47 ms of copy time (31.1 GB/s)
+  H2D copies on non-null streams (pid 36225): 939.5 MB in 55.30 ms of copy time (17.0 GB/s)
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     36225      7     Host-to-Device       Pinned->Device       1028 B: 3
+     36225      7     Host-to-Device       Pinned->Device          4 B: 2
+     36225      7     Host-to-Device       Pinned->Device         32 B: 2
+     36225      7     Host-to-Device       Pinned->Device         28 B: 2
+     36225     25     Host-to-Device       Pinned->Device   58720256 B: 1
+     36225     25     Host-to-Device       Pinned->Device  117440512 B: 1
+     36225     25     Host-to-Device       Pinned->Device  352321536 B: 1
+     36225      7     Host-to-Device       Pinned->Device        520 B: 1
+     36225      7     Host-to-Device       Pinned->Device          8 B: 1
+     36225     13     Device-to-Host       Device->Pinned          8 B: 1
+     36225     13     Device-to-Host       Device->Pinned          4 B: 1
+     36225      7     Host-to-Device       Pinned->Device       4160 B: 1
+
+[measured:reuse-decode] wall 2357.7 ms, GPU busy 2320.9 ms (98%), 52834 GPU ops, 147 model steps
+
+  phase=all: 4 stream(s) with work, 353 kernels/step, GPU kernel time 16.17 ms/step
+  wall 16.04 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.01 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0    51905     49165     450     168   2281.00  96.0% (null)
+        25     0        0         0       5       0     93.19   3.9%
+        29     0        0         0      32       0      2.23   0.1%
+        13     0        0         0     274       0      0.41   0.0%
+
+  non-null streams: busy time overlapping null-stream kernels; copies
+  all 3 non-null streams (pid 36225): busy 95.70 ms, overlapped 53.96 ms (56%)
+  D2H copies on non-null streams (pid 36225): 36.7 MB in 2.65 ms of copy time (13.9 GB/s)
+  H2D copies on non-null streams (pid 36225): 953.7 MB in 93.19 ms of copy time (10.2 GB/s)
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     36225      7     Host-to-Device       Pinned->Device       1028 B: 137
+     36225      7   Device-to-Device       Device->Device       6144 B: 127
+     36225      7     Host-to-Device       Pinned->Device         64 B: 117
+     36225     13     Device-to-Host       Device->Pinned         64 B: 117
+     36225     13     Device-to-Host       Device->Pinned         32 B: 117
+     36225      7     Host-to-Device       Pinned->Device         12 B: 18
+     36225      7     Host-to-Device       Pinned->Device          8 B: 16
+     36225     29     Device-to-Host       Device->Pinned     917504 B: 14
+     36225     29     Device-to-Host       Device->Pinned    1376256 B: 13
+     36225     13     Device-to-Host       Device->Pinned         24 B: 8
+     36225      7     Host-to-Device       Pinned->Device         40 B: 7
+     36225     13     Device-to-Host       Device->Pinned         40 B: 7
+
+[measured:mixed] wall 4778.3 ms, GPU busy 4704.6 ms (98%), 108485 GPU ops, 261 model steps
+
+  phase=all: 4 stream(s) with work, 376 kernels/step, GPU kernel time 18.45 ms/step
+  wall 18.31 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.01 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0    98080     92544     867    8960   4663.11  96.8% (null)
+        25     0        0         0       6       0    140.68   2.9%
+        29     0        0         0      56       0     10.93   0.2%
+        13     0        0         0     516       0      1.46   0.0%
+
+  non-null streams: busy time overlapping null-stream kernels; copies
+  all 3 non-null streams (pid 36225): busy 152.95 ms, overlapped 109.28 ms (71%)
+  D2H copies on non-null streams (pid 36225): 367.1 MB in 12.39 ms of copy time (29.6 GB/s)
+  H2D copies on non-null streams (pid 36225): 946.4 MB in 140.68 ms of copy time (6.7 GB/s)
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     36225      7     Host-to-Device       Pinned->Device       1028 B: 258
+     36225      7   Device-to-Device       Device->Device       6144 B: 158
+     36225      7   Device-to-Device       Device->Device      12288 B: 91
+     36225      7     Host-to-Device       Pinned->Device        128 B: 90
+     36225     13     Device-to-Host       Device->Pinned        128 B: 90
+     36225     13     Device-to-Host       Device->Pinned         64 B: 90
+     36225      7     Host-to-Device       Pinned->Device        160 B: 83
+     36225     13     Device-to-Host       Device->Pinned        160 B: 83
+     36225     13     Device-to-Host       Device->Pinned         80 B: 83
+     36225      7     Host-to-Device       Pinned->Device        152 B: 41
+     36225     13     Device-to-Host       Device->Pinned        152 B: 41
+     36225     13     Device-to-Host       Device->Pinned         76 B: 41
+
+[measured:store-decode] wall 3915.5 ms, GPU busy 3862.3 ms (99%), 82382 GPU ops, 197 model steps
+
+  phase=all: 4 stream(s) with work, 375 kernels/step, GPU kernel time 19.68 ms/step
+  wall 19.88 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.02 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0    73791     69409    1078    7084   3848.26  99.3% (null)
+        29     0        0         0      36       0     14.51   0.4%
+        25     0        0         0       1       0     13.20   0.3%
+        13     0        0         0     392       0      0.40   0.0%
+
+  non-null streams: busy time overlapping null-stream kernels; copies
+  all 3 non-null streams (pid 36225): busy 28.10 ms, overlapped 12.81 ms (46%)
+  D2H copies on non-null streams (pid 36225): 572.6 MB in 14.91 ms of copy time (38.4 GB/s)
+  H2D copies on non-null streams (pid 36225): 45.4 MB in 13.20 ms of copy time (3.4 GB/s)
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     36225      7   Device-to-Device       Device->Device       3072 B: 464
+     36225      7     Host-to-Device       Pinned->Device       1028 B: 196
+     36225      7   Device-to-Device       Device->Device      98304 B: 123
+     36225      7     Host-to-Device       Pinned->Device        256 B: 64
+     36225     13     Device-to-Host       Device->Pinned        256 B: 64
+     36225     13     Device-to-Host       Device->Pinned        128 B: 64
+     36225     13     Device-to-Host       Device->Pinned          8 B: 33
+     36225      7     Host-to-Device       Pinned->Device         24 B: 32
+     36225      7   Device-to-Device       Device->Device      12288 B: 31
+     36225     13     Device-to-Host       Device->Pinned         24 B: 31
+     36225     13     Device-to-Host       Device->Pinned         12 B: 31
+     36225      7     Host-to-Device       Pinned->Device        232 B: 27
+
+[measured:store-prefill] wall 1451.6 ms, GPU busy 1436.4 ms (99%), 1866 GPU ops, 13 model steps
+
+  phase=all: 3 stream(s) with work, 140 kernels/step, GPU kernel time 110.84 ms/step
+  wall 111.66 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.01 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0     1818         0      30       0   1419.19  98.5% (null)
+        29     0        0         0       6       0     21.64   1.5%
+        13     0        0         0      12       0      0.03   0.0%
+
+  non-null streams: busy time overlapping null-stream kernels; copies
+  all 2 non-null streams (pid 36225): busy 21.67 ms, overlapped 4.39 ms (20%)
+  D2H copies on non-null streams (pid 36225): 939.5 MB in 21.67 ms of copy time (43.4 GB/s)
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     36225      7     Host-to-Device       Pinned->Device         32 B: 6
+     36225      7     Host-to-Device       Pinned->Device       1028 B: 6
+     36225      7     Host-to-Device       Pinned->Device         16 B: 5
+     36225     13     Device-to-Host       Device->Pinned         32 B: 4
+     36225     13     Device-to-Host       Device->Pinned         16 B: 3
+     36225      7     Host-to-Device       Pinned->Device       1024 B: 2
+     36225      7     Host-to-Device       Pinned->Device       2048 B: 2
+     36225      7     Host-to-Device       Pinned->Device         64 B: 2
+     36225     13     Device-to-Host       Device->Pinned         64 B: 2
+     36225      7     Host-to-Device       Pinned->Device         24 B: 2
+     36225     29     Device-to-Host       Device->Pinned  117440512 B: 2
+     36225     29     Device-to-Host       Device->Pinned  234881024 B: 2
+
+################ output comparison ################
+
+== prefix-big measured pass (no logprobs) vs reference
+  reuse-decode: 14/16 identical; top-2 gap at first mismatch: {0.0: 2}
+    request 2: pos 0: reference token 198, other 220; reference top-2 logprob gap 0.0000 (other picked the runner-up)
+    request 8: pos 0: reference token 83, other 198; reference top-2 logprob gap 0.0000 (other picked the runner-up)
+
+== offload-native vs reference
+  reuse-prefill: 16/16 identical
+  reuse-decode: 14/16 identical; top-2 gap at first mismatch: {0.0: 2}
+    request 2: pos 0: reference token 198, other 220; reference top-2 logprob gap 0.0000 (other picked the runner-up)
+    request 8: pos 0: reference token 83, other 198; reference top-2 logprob gap 0.0000 (other picked the runner-up)
+  mixed: 32/32 identical
+
+== offload-simple vs reference
+  reuse-prefill: 16/16 identical
+  reuse-decode: 14/16 identical; top-2 gap at first mismatch: {0.0: 2}
+    request 2: pos 0: reference token 198, other 220; reference top-2 logprob gap 0.0000 (other picked the runner-up)
+    request 8: pos 0: reference token 83, other 198; reference top-2 logprob gap 0.0000 (other picked the runner-up)
+  mixed: 32/32 identical
+
+== prefix vs reference
+  reuse-prefill: 16/16 identical
+  reuse-decode: 15/16 identical; top-2 gap at first mismatch: {0.0: 1}
+    request 8: pos 0: reference token 83, other 198; reference top-2 logprob gap 0.0000 (other picked the runner-up)
+  mixed: 32/32 identical

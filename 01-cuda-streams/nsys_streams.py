@@ -4,6 +4,8 @@ Answers three different questions that "how many streams" can mean:
   1. created  - streams each CUDA context knows about (TARGET_INFO_CUDA_STREAM) and the API calls that made them
   2. active   - streams that received any GPU work (kernels, copies, memsets, event records) during the run
   3. busy     - how GPU time inside each NVTX "measured*" range splits across streams
+  plus, for streams other than the null stream: how much of their busy time overlaps kernels on the null stream,
+  and the bytes and bandwidth of their copies
 
 GPU work is attributed to a window / phase through the runtime API call that launched it (correlationId,
 which is only unique per process), because the GPU executes work later than the host enqueues it.
@@ -72,19 +74,21 @@ class Phases:
 
 
 def gpu_activities(db):
-    """(kind, pid, streamId, start, end, api_start, in_graph) for kernels, memcpys and memsets."""
+    """(kind, pid, streamId, start, end, api_start, in_graph, bytes, direction) for kernels, memcpys and memsets.
+    bytes and direction ("H2D", "D2H", ...) are only set for memcpys."""
     acts = []
-    sources = [("kernel", "CUPTI_ACTIVITY_KIND_KERNEL", "a.graphNodeId is not null"),
-               ("memcpy", "CUPTI_ACTIVITY_KIND_MEMCPY", "a.graphNodeId is not null"),
-               ("memset", "CUPTI_ACTIVITY_KIND_MEMSET", "0")]
-    for kind, table, graph_expr in sources:
+    sources = [("kernel", "CUPTI_ACTIVITY_KIND_KERNEL", "a.graphNodeId is not null", "0, 0"),
+               ("memcpy", "CUPTI_ACTIVITY_KIND_MEMCPY", "a.graphNodeId is not null", "a.bytes, a.copyKind"),
+               ("memset", "CUPTI_ACTIVITY_KIND_MEMSET", "0", "0, 0")]
+    directions = {1: "H2D", 2: "D2H", 8: "D2D"}  # CUpti_ActivityMemcpyKind
+    for kind, table, graph_expr, extra in sources:
         if not has_table(db, table):
             continue
-        for gpid, *row in db.execute(
-                f"select a.globalPid, a.streamId, a.start, a.end, r.start, {graph_expr} from {table} a "
+        for gpid, *row, copy_kind in db.execute(
+                f"select a.globalPid, a.streamId, a.start, a.end, r.start, {graph_expr}, {extra} from {table} a "
                 f"join CUPTI_ACTIVITY_KIND_RUNTIME r on r.correlationId = a.correlationId "
                 f"and (r.globalTid >> 24) = (a.globalPid >> 24)"):
-            acts.append((kind, pid_of(gpid), *row))
+            acts.append((kind, pid_of(gpid), *row, directions.get(copy_kind, str(copy_kind)) if kind == "memcpy" else None))
     return acts
 
 
@@ -100,6 +104,31 @@ def memcpy_details(db, w_start, w_end):
         "and (r.globalTid >> 24) = (a.globalPid >> 24) where r.start between ? and ?", (w_start, w_end))
     return Counter((pid_of(g), sid, op.get(k, k), f"{mem.get(s, s)}->{mem.get(d, d)}", b)
                    for g, sid, k, s, d, b in rows)
+
+
+def merged(intervals):
+    """Sorted, disjoint union of (start, end) intervals."""
+    out = []
+    for s, e in sorted(intervals):
+        if out and s <= out[-1][1]:
+            out[-1][1] = max(out[-1][1], e)
+        else:
+            out.append([s, e])
+    return out
+
+
+def overlap_ns(a, b):
+    """Total length of the intersection of two interval unions."""
+    a, b = merged(a), merged(b)
+    i = j = total = 0
+    while i < len(a) and j < len(b):
+        lo, hi = max(a[i][0], b[j][0]), min(a[i][1], b[j][1])
+        total += max(0, hi - lo)
+        if a[i][1] < b[j][1]:
+            i += 1
+        else:
+            j += 1
+    return total
 
 
 def union_ns(intervals):
@@ -164,7 +193,7 @@ def report_window(db, name, w_start, w_end, acts, prio, null_streams):
         if not rows:
             continue
         per = defaultdict(Counter)
-        for kind, pid, sid, s, e, _, in_graph in rows:
+        for kind, pid, sid, s, e, _, in_graph, _, _ in rows:
             c = per[pid, sid]
             c[kind] += 1
             c["graph"] += bool(in_graph) and kind == "kernel"
@@ -190,11 +219,44 @@ def report_window(db, name, w_start, w_end, acts, prio, null_streams):
             print(f"  {pid_val}{sid:>8} {prio.get((pid, sid), '?'):>5} {c['kernel']:>8} {c['graph']:>9} "
                   f"{c['memcpy']:>7} {c['memset']:>7} {c['ns'] / 1e6:>9.2f} {100 * c['ns'] / total_ns:>5.1f}%{tag}")
 
+    report_side_streams(inside, null_streams)
+
     copies = memcpy_details(db, w_start, w_end)
     if copies:
         print("\n  memcpys (pid, stream, direction, memory kinds, bytes): count")
         for (pid, sid, kind, mem, nbytes), n in sorted(copies.items(), key=lambda kv: -kv[1])[:12]:
             print(f"  {pid:>8} {sid:>6} {kind:>18} {mem:>20} {nbytes:>10} B: {n}")
+
+
+def report_side_streams(inside, null_streams):
+    """For every non-null stream: busy time, the part that overlaps null-stream kernels, and its copies."""
+    null_kernels = defaultdict(list)
+    side = defaultdict(list)
+    copies = defaultdict(lambda: [0, 0])  # (pid, sid, H2D/D2H) -> [bytes, ns]
+    for kind, pid, sid, s, e, _, _, nbytes, direction in inside:
+        if sid == null_streams.get(pid):
+            if kind == "kernel":
+                null_kernels[pid].append((s, e))
+            continue
+        side[pid, sid].append((s, e))
+        if kind == "memcpy" and nbytes:
+            copies[pid, sid, direction][0] += nbytes
+            copies[pid, sid, direction][1] += e - s
+    if not side:
+        return
+    print("\n  non-null streams: busy time overlapping null-stream kernels; copies")
+    for pid in sorted({p for p, _ in side}):
+        all_side = [iv for (p, _), ivs in side.items() if p == pid for iv in ivs]
+        busy, ov = union_ns(all_side), overlap_ns(all_side, null_kernels[pid])
+        print(f"  all {sum(1 for p, _ in side if p == pid)} non-null streams (pid {pid}): busy {busy / 1e6:.2f} ms, "
+              f"overlapped {ov / 1e6:.2f} ms ({100 * ov / max(busy, 1):.0f}%)")
+    per_dir = defaultdict(lambda: [0, 0])
+    for (pid, sid, d), (nbytes, ns) in copies.items():
+        per_dir[pid, d][0] += nbytes
+        per_dir[pid, d][1] += ns
+    for (pid, d), (nbytes, ns) in sorted(per_dir.items()):
+        print(f"  {d} copies on non-null streams (pid {pid}): {nbytes / 1e6:.1f} MB in {ns / 1e6:.2f} ms of copy time"
+              f" ({nbytes / max(ns, 1):.1f} GB/s)")
 
 
 def main(path):
