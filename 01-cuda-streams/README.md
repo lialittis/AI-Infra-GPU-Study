@@ -34,6 +34,9 @@ Measured on a single GB10. Details and numbers are in sections 3, 5 and 6.
   - **Async scheduling** overlaps per-token CPU work with GPU work through that one copy stream. In vLLM, async scheduling is worth 13–15% and graphs about 5%.
 - Multiple *compute* streams appear only for multi-GPU communication, micro-batch overlap, KV offload and speculative decoding. None of these was exercised here.
 
+What graphs and async copies cost in correctness, and how each failure ties back to these results, is covered in
+[02-cuda-graph-numerical-errors: Relation to 01](../02-cuda-graph-numerical-errors/README.md#relation-to-01-cuda-streams).
+
 ## 1. Mental model
 
 **Programming model.** A stream is an **in-order queue of GPU work** (kernels, memcpys, memsets, event records).

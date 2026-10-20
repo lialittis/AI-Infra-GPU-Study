@@ -66,12 +66,8 @@ from what eager code would do:
 | **Which work was recorded** | Only work on the capture stream, or on streams forked from it with events, is recorded. Work issued elsewhere ran once during capture and is missing from replays. Submodule `forward` calls, and their hooks, don't happen at all | Library stream awareness, module hooks | Issue work on `torch.cuda.current_stream()`, or fork and join an internal stream with `wait_stream`. Put hook logic outside the graph |
 | **Timing** | `replay()` only enqueues work. CPU writes to pinned memory race the copies already queued, and graphs replayed on several streams race each other on shared pool memory | Pinned memory race, parallel replay | Wait on an event (or synchronize) before writing to host memory, or copy into a static device tensor. Don't replay pool-sharing graphs concurrently |
 
-The first three rows are "a graph is a recording", and the last row is "a replay is asynchronous". The last row
-also ties back to [01-cuda-streams](../01-cuda-streams/README.md):
-- Concurrent replay is just multi-stream execution, with the same rule as before: overlap is only safe when the two
-  sides share no memory.
-- The library-stream bug is the capture-time version of "work on the wrong stream". Step B/C's stream analysis
-  (`nsys_streams.py`) is exactly the tool the page recommends for finding it.
+The first three rows are "a graph is a recording", and the last row is "a replay is asynchronous". How each row
+maps onto 01-cuda-streams is in [Relation to 01](#relation-to-01-cuda-streams).
 
 ## Results
 
@@ -224,3 +220,24 @@ Block 2 carries the page's "different precision during capture" anti-pattern.
   - concurrent replay
   - pinned races
   - work on the wrong stream
+
+## Relation to 01-cuda-streams
+
+[01-cuda-streams](../01-cuda-streams/README.md) found that single-GPU inference runs all compute on one stream and
+gets its speed from two things: **CUDA graphs**, which remove launch overhead, and **async copies on a side stream**,
+which overlap CPU work with the GPU. This topic is the correctness cost of those same two tools. The first three
+rows of the [systematic view](#a-systematic-view) come from graphs, and the timing row comes from async copies.
+
+| Here (02) | There (01) | The common point |
+|---|---|---|
+| Pinned race (`s2_race`): the CPU rewrites a pinned buffer before the queued H2D copy reads it. Fixed with `fix-event` | Step B `async` mode: the CPU may read the pinned D2H token buffer only after an event says the copy is done | The same pinned-buffer-plus-event pattern, in opposite directions. Touching the buffer early gives a wrong value, not an error |
+| Pageable copies are refused during capture, so the page's freed-CPU-input cases fail, including its `torch.tensor(i, device="cuda")` fix. `fix-full` and the GPU-tensor scalar fixes work | Step A 04: a pageable `cudaMemcpyAsync` blocks the host. Step B: `torch.tensor(..., device="cuda")` hid a sync in every step | A pageable copy stages synchronously through the host, so it is slow in eager mode and can't be recorded in a graph. Same fix in both: keep loop state on the GPU and update it in place |
+| `dynamic-input`, freed inputs: graphs read fixed addresses | Step B: `torch.compile` skipped graphs ("mutated inputs") until `mark_static_address(cache)` | Graphed inputs must be static buffers that stay alive |
+| `library-stream`: work on a stream not forked from the capture stream is missing from replays | Steps B/C: extra streams are active only during warmup and capture, because PyTorch captures on a side stream (the legacy null stream, where all compute runs, can't be captured) | Capture is the one time several streams matter. `nsys_streams.py` is the tool for spotting work on the wrong stream |
+| `shared-pool`, `replay-order`, `parallel-replay`: graphs sharing a pool are correct only when replayed one at a time, in capture order | Step C: vLLM replays all its graphs on the single null stream, and they all share one pool (`current_platform.get_global_graph_pool()` in vLLM 0.32's `compilation/cuda_graph.py` and `v1/worker/gpu/cudagraph_utils.py`) | A single replay stream is what makes pool sharing safe. The parallel-replay race also needed 256M-element tensors to appear: as in Step A 01, streams only allow overlap, and the kernels must be long enough to actually overlap |
+| `dynamic-shape/fix-pad`, `fix-bucket`, `fix-partial` | Step C: 2995 graphs, one per captured batch size, with batches padded up to the next size. Prefill runs eagerly because its chunks are larger than the largest captured size | vLLM applies these fixes at scale. They are also why 01 counted about 3000 "created" streams |
+| `output-reuse`: the next replay overwrites the output buffer | Step C: `output_copy_stream` copies the sampled tokens out of the graph's output before the next step | "Copy outputs before the next replay", done asynchronously |
+
+In short, 01 shows why engines rely on graphs and async copies, and 02 shows what goes wrong silently when they are
+used carelessly. The fixes reuse 01's tools: events, static GPU-resident buffers, streams forked and joined with
+`wait_stream`, and replay on a single stream.
