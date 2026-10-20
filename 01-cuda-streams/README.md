@@ -6,10 +6,11 @@ Plan:
 - **Step A** (this directory): CUDA C microbenchmarks to understand the mechanism.
 - **Step B** ([`pytorch/`](pytorch/)): a PyTorch generation loop under `nsys`.
 - **Step C** ([`vllm/`](vllm/)): vLLM serving a real model under `nsys`.
+- **Step D** ([`vllm/spec.py`](vllm/spec.py)): vLLM speculative decoding, a feature expected to add streams.
 
 ## Summary
 
-Measured on a single GB10. Details and numbers are in sections 3, 5 and 6.
+Measured on a single GB10. Details and numbers are in sections 3, 5, 6 and 7.
 
 **How streams work (Step A):**
 - A stream is an in-order queue. Streams give the GPU *permission* to overlap work; free SMs decide whether it actually does (concurrency ≈ min(#streams, capacity / blocks per kernel)).
@@ -32,7 +33,8 @@ Measured on a single GB10. Details and numbers are in sections 3, 5 and 6.
 - **Performance comes from two other mechanisms:**
   - **CUDA graphs** remove CPU launch overhead. Step B's eager loop was launch-bound (~13 µs × 950 kernels per step on this CPU).
   - **Async scheduling** overlaps per-token CPU work with GPU work through that one copy stream. In vLLM, async scheduling is worth 13–15% and graphs about 5%.
-- Multiple *compute* streams appear only for multi-GPU communication, micro-batch overlap, KV offload and speculative decoding. None of these was exercised here.
+- **Speculative decoding (Step D) adds no compute stream either.** The draft model and the verify pass run one after the other on the null stream. The only new active stream copies draft tokens to the host, and only when structured output needs them. KV offload's streams are copy streams too (from the source; not measured yet).
+- Multiple *compute* streams appear only for multi-GPU communication and micro-batch overlap, which a single GPU can't exercise.
 
 What graphs and async copies cost in correctness, and how each failure ties back to these results, is covered in
 [02-cuda-graph-numerical-errors: Relation to 01](../02-cuda-graph-numerical-errors/README.md#relation-to-01-cuda-streams).
@@ -320,9 +322,136 @@ On a single GPU: **one stream for all compute, plus one for output copies.** Sev
 - **FlashAttention on sm_121.** vLLM's FA2 library contains only sm_80 binaries *plus sm_80 PTX*, so the driver JIT-compiles it for GB10 on first use (cached in `~/.nv/ComputeCache`). FA3 (sm_90a) is unusable, and so are FlashMLA and DeepGEMM (sm_90a/sm_100).
 - **Unified memory:** `gpu_memory_utilization` is a fraction of *system* RAM on GB10. The default 0.9 would claim ~110 GB of a shared machine.
 
-## 7. Next
+## 7. Step D: speculative decoding in vLLM
+
+**Question:** Speculative decoding runs a second "model" (a draft) next to the target. Does it add compute
+streams, or only copies? And what does it cost and change?
+
+Code is in [`vllm/`](vllm/):
+- `spec.py`: configs × workloads, each workload in an NVTX `measured:<name>` range.
+- `spec_compare.py`: token-by-token comparison against a baseline reference.
+- `run_spec.sh`: runs every config under nsys, then `../nsys_streams.py`, then the comparison.
+
+Raw output is in `results/stepD-*.txt`. Same engine and model as Step C (vLLM 0.32.0, Qwen2.5-1.5B-Instruct, bf16).
+Async scheduling stays on in every config: vLLM enables it for `ngram_gpu` and `draft_model`, and turns it off for
+CPU `ngram`.
+
+| Config | Drafting |
+|---|---|
+| `baseline` | none |
+| `ngram-k4` | prompt lookup on the GPU (`ngram_gpu`, 5-gram match), 4 draft tokens, no extra model |
+| `draft-k2` / `k4` / `k8` | Qwen2.5-0.5B-Instruct as draft model, 2 / 4 / 8 draft tokens |
+
+The workloads use real text through the chat template, because acceptance depends on content:
+
+| Workload | Requests | Task | Expected acceptance |
+|---|---|---|---|
+| `repeat-b1`, `repeat-b32` | 1, 32 | copy a 3-paragraph passage verbatim | high: the output is in the prompt |
+| `story-b1`, `story-b32` | 1, 32 | write a short story | low |
+| `json-b1` | 1 | the story prompt under a JSON schema | — (structured output is the only case that copies draft tokens to the host) |
+
+### Streams: still one compute stream
+
+| | baseline | ngram-k4 | draft-k2 | draft-k4 | draft-k8 |
+|---|---|---|---|---|---|
+| Streams created | 3130 | 3494 | 3673 | 3494 | 3429 |
+| … `cudaGraphInstantiate` calls | 2995 | 3359 | 3538 | 3359 | 3294 |
+| Streams that received work | 5 | 6 | 6 | 6 | 6 |
+| Streams carrying GPU time | **1** (null) | **1** | **1** | **1** | **1** |
+
+- **The draft and the verify pass run back to back on the null stream (id 7).** Every config and workload puts
+  99.9–100% of GPU time there. The V2 runner's speculators (`v1/worker/gpu/spec_decode/`) never switch streams.
+- **The one new active stream is id 17, vLLM's `DraftTokensHandler.copy_stream`.** It does one D2H copy of the
+  draft tokens per step, and only in `json-b1`: the scheduler needs drafts on the host only to check them against
+  the grammar. Stream 21, the structured-output copy stream (`v1/worker/gpu/structured_outputs.py`), is active in
+  `json-b1` for the baseline too.
+- **More streams are "created" only because more graphs are captured** (one driver stream per instantiated graph,
+  as in Step C).
+
+### Performance
+
+Batch 1 (ms per output token; acceptance rate and tokens per verify step in parentheses):
+
+| Config | repeat-b1 | story-b1 | json-b1 |
+|---|---|---|---|
+| baseline | 16.35 | 16.34 | 16.48 |
+| ngram-k4 | **3.39** (88%, 4.54) | 14.39 (0%) | 14.41 (0%) |
+| draft-k2 | 9.85 (98%, 2.97) | **12.76** (61%, 2.22) | **12.28** (67%) |
+| draft-k4 | 9.04 (99%, 4.94) | 14.51 (48%, 2.93) | 13.70 (55%) |
+| draft-k8 | 8.65 (97%, 8.75) | 19.63 (32%, 3.59) | 18.78 (37%) |
+
+Batch 32 (output tok/s):
+
+| Config | repeat-b32 | story-b32 |
+|---|---|---|
+| baseline | 1727 | 2024 |
+| ngram-k4 | **2055** (68%) | 1558 (0%) |
+| draft-k2 | 1881 (97%) | 1860 (63%) |
+| draft-k4 | 1710 (94%) | 1486 (48%) |
+| draft-k8 | 1390 (88%) | 1029 (30%) |
+
+What explains the numbers:
+- **Prompt lookup is nearly free, so it wins whenever the output repeats the prompt.** On `repeat-b1` it is 4.8×
+  faster than the baseline, against 1.8× for the draft model with the same acceptance.
+- **The draft model runs eagerly.** `standalone_ar/speculator.py` says "CUDA graph not yet supported for standalone
+  AR speculator":
+  - Kernels per step rise from 324 (baseline) to 838 / 1364 / 2388 at k = 2 / 4 / 8.
+  - The fraction of kernels inside graphs falls from 95% to 33% / 20% / 11%, and the GPU is idle 4–7% of the time.
+  - This is Step B's launch overhead coming back.
+- **The draft is also too big for this target.** Each draft pass costs about 5.8 ms, roughly 40% of a target step
+  (37.7 ms per k=4 step vs 14.5 ms for ngram). Qwen2.5-0.5B has about a third of the target's weights, and eager
+  launches add the rest. Raising k only pays off while nearly every draft is accepted: k=8 is the fastest config
+  on `repeat-b1` and the slowest on `story-b1`.
+- **ngram never skips verification.** When no 5-gram matches, `ngram_gpu` fills the draft slots with the last
+  sampled token, so every step verifies k+1 tokens. That keeps shapes fixed for CUDA graphs: it is
+  [02's pad-to-a-static-shape fix](../02-cuda-graph-numerical-errors/README.md#a-systematic-view). The cost shows
+  at batch 32, where `story-b32` verifies 160 tokens per step for nothing (−23%).
+- **On GB10, verifying 5 tokens is cheaper than decoding 1.** On `story-b1`, ngram accepts nothing yet is 12% faster
+  per step than the baseline (14.2 vs 16.1 ms of GPU time). The traces show cuBLAS choosing a different GEMM
+  kernel by row count: the M=1 kernel takes 15.6 ms per step for the 112 linear layers (28 layers × 4), the M=5
+  kernel 13.6 ms. That is about 190 vs 220 GB/s of weight streaming. Plain batch-1 decode on this machine is
+  slower than it needs to be.
+- **Batching and speculation compete for the same headroom.** Both use spare compute while weights stream from
+  memory. At batch 32 only high acceptance with small k still gains (ngram +19%, draft-k2 +9% on `repeat-b32`).
+
+### Correctness: greedy output changes only at near-ties
+
+With temperature 0, speculative decoding is meant to produce exactly the target model's text. `spec_compare.py`
+checks this the way 02 does: token by token against a reference, which is the baseline run again with
+`logprobs=2`. At each first mismatch it reads the reference's top-2 logprob gap.
+
+| Comparison | Identical requests | Top-2 gap at first mismatch |
+|---|---|---|
+| baseline b1 vs the same prompt inside b32 (no speculation) | repeat 1/1, story 0/1 | 0.25 |
+| baseline measured pass vs reference (same config, logprobs off vs on) | all, except story-b32 28/32 | 0, 0.125 |
+| ngram-k4 / draft-k2 / k4 / k8 | repeat-b1 1/1, repeat-b32 29–31/32, story-b1 0/1, story-b32 0–1/32, json-b1 0/1 | always 0, 0.125 or 0.25 |
+
+- **Every mismatch is a near-tie at the resolution of bf16 logits.** Logits around 16–32 are spaced 0.125 apart in
+  bf16, so a gap of 0 or 0.125 means the top two tokens were equal or one step apart. No mismatch had a larger
+  gap, and nearly always the other run picked the reference's runner-up.
+- **The cause is the verify pass's shape, not speculation itself.** All four speculative configs diverge on
+  `story-b1` at the same position (76) with the same token. That includes `ngram-k4`, which accepted no draft, so
+  its text came entirely from the target. What they share is running the target on k+1 tokens per step, which
+  uses different GEMM kernels and so different rounding.
+- **The baseline does this to itself as well.** Batch 1 vs batch 32 flips a tie, and so does the same config at
+  batch 32 with logprobs on vs off. "Lossless" speculative decoding is exact only up to the same batch-invariance limits as plain
+  decoding.
+- **Structured output stays valid.** `json-b1` diverges from the reference at a tie, but every config's output
+  parses as JSON.
+
+### Answer
+
+On one GPU, speculative decoding adds **no compute concurrency**. The draft and the target take turns on the same
+stream. The only new stream copies draft tokens to the host, and only with structured output. Its value comes
+from doing more work per weight read, as batching does. On GB10 with vLLM 0.32:
+- Prompt lookup is the clear win when outputs repeat the input.
+- A draft model is limited by running without CUDA graphs and by its size relative to the target.
+
+## 8. Next
 
 - [ ] Step A follow-up: zero-copy reads of `malloc`/pinned memory from a kernel on GB10, compared with copy-then-compute.
-- [ ] vLLM features that add streams: speculative decoding (draft-token copy streams), KV-cache CPU offload. Do they add *compute* concurrency or only copies?
+- [x] Speculative decoding (Step D): only a draft-token copy stream, no compute concurrency.
+- [ ] KV-cache CPU offload (`kv_offloading_size`, `SimpleCPUOffloadConnector`): measure its copy streams, low priority and contention for GB10's single copy engine.
+- [ ] Step D follow-ups: a draft model ~10× smaller than the target (or EAGLE heads) once graphed; the M=1 vs M=5 GEMM kernel choice on GB10 in isolation.
 - [ ] Optional: multi-stream inside one forward pass (e.g. overlapping an independent branch) to see when a second *compute* stream helps.
 - [ ] Multi-GPU (needs different hardware): NCCL communication streams, DBO `comm_stream`, `CUDA_DEVICE_MAX_CONNECTIONS=1` as used by Megatron.

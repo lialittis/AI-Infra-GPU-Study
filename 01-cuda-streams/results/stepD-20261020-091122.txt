@@ -1,0 +1,685 @@
+vllm 0.32.0 | torch 2.13.0+cu130 | CUDA 13.0 | NVIDIA GB10
+NVIDIA Nsight Systems version 2025.3.2.474-253236389321v0
+
+################ config=baseline ################
+CONFIG baseline: speculative_config=None async_scheduling=True
+RESULT config=baseline workload=repeat-b1 requests=1 prompt_tokens=215 output_tokens=176: 2878.2 ms, 61 output tok/s, 16.35 ms per output token
+RESULT config=baseline workload=repeat-b32 requests=32 prompt_tokens=6609 output_tokens=5368: 3108.8 ms, 1727 output tok/s
+RESULT config=baseline workload=story-b1 requests=1 prompt_tokens=43 output_tokens=256: 4182.1 ms, 61 output tok/s, 16.34 ms per output token
+RESULT config=baseline workload=story-b32 requests=32 prompt_tokens=1322 output_tokens=8165: 4033.7 ms, 2024 output tok/s
+RESULT config=baseline workload=json-b1 requests=1 prompt_tokens=47 output_tokens=237: 3905.3 ms, 61 output tok/s, 16.48 ms per output token
+[process 30837 VLLM::EngineCor] null stream id = 7
+  [created] 3130 streams, by priority: {-5: 1, -3: 32, -2: 32, -1: 32, 0: 3033}; stream-create / graph-instantiate calls: {'cudaStreamCreateWithPriority_v5050': 128, 'cudaGraphInstantiateWithFlags_v11040': 2995}
+  [active]  5 streams received work during the whole run: [7, 13, 21, 25, 29]
+
+[measured:repeat-b1] wall 2878.2 ms, GPU busy 2859.7 ms (99%), 63545 GPU ops, 178 model steps
+
+  phase=all: 2 stream(s) with work, 324 kernels/step, GPU kernel time 16.07 ms/step
+  wall 16.17 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.01 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0    57719     54637    5472       0   2859.64 100.0% (null)
+        13     0        0         0     354       0      0.26   0.0%
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     30837      7   Device-to-Device       Device->Device       3072 B: 5104
+     30837      7     Host-to-Device       Pinned->Device          8 B: 177
+     30837      7     Host-to-Device       Pinned->Device       1028 B: 177
+     30837     13     Device-to-Host       Device->Pinned          8 B: 177
+     30837     13     Device-to-Host       Device->Pinned          4 B: 177
+     30837      7     Host-to-Device       Pinned->Device          4 B: 13
+     30837      7     Host-to-Device       Pinned->Device         56 B: 1
+
+[measured:repeat-b32] wall 3108.8 ms, GPU busy 3056.0 ms (98%), 78321 GPU ops, 179 model steps
+
+  phase=all: 2 stream(s) with work, 379 kernels/step, GPU kernel time 17.08 ms/step
+  wall 17.37 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.03 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0    67921     64184     692    9352   3056.67 100.0% (null)
+        13     0        0         0     356       0      0.32   0.0%
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     30837      7     Host-to-Device       Pinned->Device       1028 B: 178
+     30837      7   Device-to-Device       Device->Device      98304 B: 164
+     30837     13     Device-to-Host       Device->Pinned        128 B: 160
+     30837      7     Host-to-Device       Pinned->Device        256 B: 159
+     30837     13     Device-to-Host       Device->Pinned        256 B: 159
+     30837      7     Host-to-Device       Pinned->Device          4 B: 44
+     30837      7     Host-to-Device       Pinned->Device         16 B: 32
+     30837      7     Host-to-Device       Pinned->Device         12 B: 31
+     30837      7   Device-to-Device       Device->Device       3072 B: 29
+     30837      7     Host-to-Device       Pinned->Device          8 B: 11
+     30837      7     Host-to-Device       Pinned->Device         20 B: 10
+     30837      7   Device-to-Device       Device->Device       6144 B: 8
+
+[measured:story-b1] wall 4182.1 ms, GPU busy 4152.9 ms (99%), 91916 GPU ops, 257 model steps
+
+  phase=all: 2 stream(s) with work, 325 kernels/step, GPU kernel time 16.16 ms/step
+  wall 16.27 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.01 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0    83450     79020    7926      28   4152.74 100.0% (null)
+        13     0        0         0     512       0      0.37   0.0%
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     30837      7   Device-to-Device       Device->Device       3072 B: 7395
+     30837      7     Host-to-Device       Pinned->Device          8 B: 256
+     30837      7     Host-to-Device       Pinned->Device       1028 B: 256
+     30837     13     Device-to-Host       Device->Pinned          8 B: 256
+     30837     13     Device-to-Host       Device->Pinned          4 B: 256
+     30837      7     Host-to-Device       Pinned->Device          4 B: 18
+     30837      7     Host-to-Device       Pinned->Device         12 B: 1
+
+[measured:story-b32] wall 4033.7 ms, GPU busy 3948.2 ms (98%), 113764 GPU ops, 259 model steps
+
+  phase=all: 2 stream(s) with work, 379 kernels/step, GPU kernel time 15.25 ms/step
+  wall 15.57 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.03 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0    98115     93300     855   14280   3949.14 100.0% (null)
+        13     0        0         0     514       0      0.42   0.0%
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     30837      7     Host-to-Device       Pinned->Device       1028 B: 257
+     30837      7   Device-to-Device       Device->Device      98304 B: 255
+     30837      7     Host-to-Device       Pinned->Device        256 B: 238
+     30837     13     Device-to-Host       Device->Pinned        256 B: 238
+     30837     13     Device-to-Host       Device->Pinned        128 B: 238
+     30837      7     Host-to-Device       Pinned->Device         24 B: 32
+     30837      7     Host-to-Device       Pinned->Device         16 B: 18
+     30837      7     Host-to-Device       Pinned->Device          8 B: 16
+     30837      7     Host-to-Device       Pinned->Device         56 B: 15
+     30837      7     Host-to-Device       Pinned->Device        248 B: 11
+     30837     13     Device-to-Host       Device->Pinned        248 B: 11
+     30837     13     Device-to-Host       Device->Pinned        124 B: 11
+
+[measured:json-b1] wall 3905.3 ms, GPU busy 3881.5 ms (99%), 86163 GPU ops, 239 model steps
+
+  phase=all: 3 stream(s) with work, 326 kernels/step, GPU kernel time 16.25 ms/step
+  wall 16.34 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.01 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0    77818     73458    7367      28   3881.33  99.9% (null)
+        21     0        0         0     474       0      2.81   0.1%
+        13     0        0         0     476       0      0.39   0.0%
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     30837      7   Device-to-Device       Device->Device       3072 B: 6873
+     30837      7     Host-to-Device       Pinned->Device          8 B: 238
+     30837      7     Host-to-Device       Pinned->Device       1028 B: 238
+     30837     13     Device-to-Host       Device->Pinned          8 B: 238
+     30837     13     Device-to-Host       Device->Pinned          4 B: 238
+     30837     21     Host-to-Device       Pinned->Device      18992 B: 237
+     30837     21     Host-to-Device       Pinned->Device          4 B: 237
+     30837      7     Host-to-Device       Pinned->Device          4 B: 17
+     30837      7     Host-to-Device       Pinned->Device         12 B: 1
+
+################ config=ngram-k4 ################
+CONFIG ngram-k4: speculative_config=SpeculativeConfig(method='ngram_gpu', model='Qwen/Qwen2.5-1.5B-Instruct', num_spec_tokens=4) async_scheduling=True
+RESULT config=ngram-k4 workload=repeat-b1 requests=1 prompt_tokens=215 output_tokens=176: 596.3 ms, 295 output tok/s, 3.39 ms per output token, drafted 156 accepted 138 (88%), 4.54 tokens per verify step
+RESULT config=ngram-k4 workload=repeat-b32 requests=32 prompt_tokens=6609 output_tokens=5369: 2612.6 ms, 2055 output tok/s, drafted 5748 accepted 3937 (68%), 3.74 tokens per verify step
+RESULT config=ngram-k4 workload=story-b1 requests=1 prompt_tokens=43 output_tokens=256: 3683.4 ms, 70 output tok/s, 14.39 ms per output token, drafted 1020 accepted 0 (0%), 1.00 tokens per verify step
+RESULT config=ngram-k4 workload=story-b32 requests=32 prompt_tokens=1322 output_tokens=8087: 5192.1 ms, 1558 output tok/s, drafted 31764 accepted 114 (0%), 1.01 tokens per verify step
+RESULT config=ngram-k4 workload=json-b1 requests=1 prompt_tokens=47 output_tokens=268: 3861.9 ms, 69 output tok/s, 14.41 ms per output token, drafted 997 accepted 0 (0%), 1.00 tokens per verify step
+[process 31253 VLLM::EngineCor] null stream id = 7
+  [created] 3494 streams, by priority: {-5: 1, -3: 32, -2: 32, -1: 32, 0: 3397}; stream-create / graph-instantiate calls: {'cudaStreamCreateWithPriority_v5050': 128, 'cudaGraphInstantiateWithFlags_v11040': 3359}
+  [active]  6 streams received work during the whole run: [7, 13, 17, 21, 25, 29]
+
+[measured:repeat-b1] wall 596.3 ms, GPU busy 591.7 ms (99%), 12647 GPU ops, 42 model steps
+
+  phase=all: 2 stream(s) with work, 295 kernels/step, GPU kernel time 14.10 ms/step
+  wall 14.20 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.01 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0    12388     11493     177       0    592.27 100.0% (null)
+        13     0        0         0      82       0      0.06   0.0%
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     31253      7     Host-to-Device       Pinned->Device          8 B: 81
+     31253      7     Host-to-Device       Pinned->Device       1028 B: 41
+     31253     13     Device-to-Host       Device->Pinned          4 B: 41
+     31253      7   Device-to-Device       Device->Device      15360 B: 40
+     31253     13     Device-to-Host       Device->Pinned         40 B: 40
+     31253      7     Host-to-Device       Pinned->Device          4 B: 13
+     31253      7     Host-to-Device       Pinned->Device        860 B: 1
+     31253      7     Host-to-Device       Pinned->Device         56 B: 1
+     31253     13     Device-to-Host       Device->Pinned          8 B: 1
+
+[measured:repeat-b32] wall 2612.6 ms, GPU busy 2595.6 ms (99%), 45564 GPU ops, 146 model steps
+
+  phase=all: 2 stream(s) with work, 300 kernels/step, GPU kernel time 17.79 ms/step
+  wall 17.89 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.01 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0    43761     40183     645     868   2597.44 100.0% (null)
+        13     0        0         0     290       0      0.27   0.0%
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     31253      7     Host-to-Device       Pinned->Device       1028 B: 145
+     31253      7   Device-to-Device       Device->Device      15360 B: 78
+     31253      7     Host-to-Device       Pinned->Device         16 B: 69
+     31253      7     Host-to-Device       Pinned->Device          8 B: 62
+     31253      7     Host-to-Device       Pinned->Device         12 B: 61
+     31253      7   Device-to-Device       Device->Device      30720 B: 60
+     31253     13     Device-to-Host       Device->Pinned         80 B: 57
+     31253     13     Device-to-Host       Device->Pinned          8 B: 57
+     31253      7     Host-to-Device       Pinned->Device        256 B: 36
+     31253      7     Host-to-Device       Pinned->Device        132 B: 36
+     31253     13     Device-to-Host       Device->Pinned       1280 B: 36
+     31253     13     Device-to-Host       Device->Pinned        128 B: 36
+
+[measured:story-b1] wall 3683.4 ms, GPU busy 3655.9 ms (99%), 78664 GPU ops, 257 model steps
+
+  phase=all: 2 stream(s) with work, 300 kernels/step, GPU kernel time 14.24 ms/step
+  wall 14.33 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.01 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0    77081     71880    1043      28   3659.31 100.0% (null)
+        13     0        0         0     512       0      0.62   0.0%
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     31253      7     Host-to-Device       Pinned->Device          8 B: 511
+     31253      7     Host-to-Device       Pinned->Device       1028 B: 256
+     31253     13     Device-to-Host       Device->Pinned          4 B: 256
+     31253      7   Device-to-Device       Device->Device      15360 B: 255
+     31253     13     Device-to-Host       Device->Pinned         40 B: 255
+     31253      7     Host-to-Device       Pinned->Device          4 B: 19
+     31253      7     Host-to-Device       Pinned->Device        172 B: 1
+     31253      7     Host-to-Device       Pinned->Device         12 B: 1
+     31253     13     Device-to-Host       Device->Pinned          8 B: 1
+
+[measured:story-b32] wall 5192.1 ms, GPU busy 5152.2 ms (99%), 79237 GPU ops, 259 model steps
+
+  phase=all: 2 stream(s) with work, 299 kernels/step, GPU kernel time 19.91 ms/step
+  wall 20.05 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.03 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0    77507     71880    1132      84   5155.18 100.0% (null)
+        13     0        0         0     514       0      0.46   0.0%
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     31253      7     Host-to-Device       Pinned->Device       1028 B: 257
+     31253      7   Device-to-Device       Device->Device      15360 B: 224
+     31253      7     Host-to-Device       Pinned->Device        256 B: 203
+     31253      7     Host-to-Device       Pinned->Device        132 B: 203
+     31253     13     Device-to-Host       Device->Pinned       1280 B: 203
+     31253     13     Device-to-Host       Device->Pinned        128 B: 203
+     31253      7   Device-to-Device       Device->Device      30720 B: 31
+     31253      7     Host-to-Device       Pinned->Device          4 B: 28
+     31253      7     Host-to-Device       Pinned->Device        128 B: 18
+     31253      7     Host-to-Device       Pinned->Device        248 B: 17
+     31253     13     Device-to-Host       Device->Pinned       1240 B: 17
+     31253     13     Device-to-Host       Device->Pinned        124 B: 17
+
+[measured:json-b1] wall 3861.9 ms, GPU busy 3836.0 ms (99%), 83920 GPU ops, 270 model steps
+
+  phase=all: 4 stream(s) with work, 302 kernels/step, GPU kernel time 14.23 ms/step
+  wall 14.30 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.01 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0    81415     75533    1134      28   3839.58  99.9% (null)
+        21     0        0         0     536       0      3.09   0.1%
+        13     0        0         0     538       0      0.41   0.0%
+        17     0        0         0     269       0      0.17   0.0%
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     31253      7     Host-to-Device       Pinned->Device          8 B: 537
+     31253      7     Host-to-Device       Pinned->Device       1028 B: 269
+     31253     13     Device-to-Host       Device->Pinned          4 B: 269
+     31253     17     Device-to-Host       Device->Pinned         32 B: 269
+     31253      7   Device-to-Device       Device->Device      15360 B: 268
+     31253     13     Device-to-Host       Device->Pinned         40 B: 268
+     31253     21     Host-to-Device       Pinned->Device      94960 B: 267
+     31253     21     Host-to-Device       Pinned->Device         20 B: 267
+     31253      7     Host-to-Device       Pinned->Device          4 B: 39
+     31253      7   Device-to-Device       Device->Device         20 B: 19
+     31253      7     Host-to-Device       Pinned->Device        188 B: 1
+     31253      7     Host-to-Device       Pinned->Device         12 B: 1
+
+################ config=draft-k2 ################
+CONFIG draft-k2: speculative_config=SpeculativeConfig(method='draft_model', model='Qwen/Qwen2.5-0.5B-Instruct', num_spec_tokens=2) async_scheduling=True
+RESULT config=draft-k2 workload=repeat-b1 requests=1 prompt_tokens=215 output_tokens=176: 1733.4 ms, 102 output tok/s, 9.85 ms per output token, drafted 118 accepted 116 (98%), 2.97 tokens per verify step
+RESULT config=draft-k2 workload=repeat-b32 requests=32 prompt_tokens=6609 output_tokens=5370: 2855.5 ms, 1881 output tok/s, drafted 3648 accepted 3530 (97%), 2.94 tokens per verify step
+RESULT config=draft-k2 workload=story-b1 requests=1 prompt_tokens=43 output_tokens=256: 3265.8 ms, 78 output tok/s, 12.76 ms per output token, drafted 230 accepted 140 (61%), 2.22 tokens per verify step
+RESULT config=draft-k2 workload=story-b32 requests=32 prompt_tokens=1322 output_tokens=8148: 4380.6 ms, 1860 output tok/s, drafted 7200 accepted 4546 (63%), 2.26 tokens per verify step
+RESULT config=draft-k2 workload=json-b1 requests=1 prompt_tokens=47 output_tokens=268: 3291.9 ms, 81 output tok/s, 12.28 ms per output token, drafted 227 accepted 153 (67%), 2.33 tokens per verify step
+[process 31678 VLLM::EngineCor] null stream id = 7
+  [created] 3673 streams, by priority: {-5: 1, -3: 32, -2: 32, -1: 32, 0: 3576}; stream-create / graph-instantiate calls: {'cudaStreamCreateWithPriority_v5050': 128, 'cudaGraphInstantiateWithFlags_v11040': 3538}
+  [active]  6 streams received work during the whole run: [7, 13, 17, 21, 25, 29]
+
+[measured:repeat-b1] wall 1733.5 ms, GPU busy 1638.4 ms (95%), 54471 GPU ops, 62 model steps
+
+  phase=all: 2 stream(s) with work, 838 kernels/step, GPU kernel time 26.43 ms/step
+  wall 27.96 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.00 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0    51934     17113    2269     146   1638.53 100.0% (null)
+        13     0        0         0     122       0      0.37   0.0%
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     31678      7   Device-to-Device       Device->Device       1792 B: 1464
+     31678      7   Device-to-Device       Device->Device          8 B: 305
+     31678      7   Device-to-Device       Device->Device          4 B: 122
+     31678      7     Host-to-Device       Pinned->Device          8 B: 121
+     31678      7     Host-to-Device       Pinned->Device       1028 B: 61
+     31678     13     Device-to-Host       Device->Pinned          4 B: 61
+     31678      7     Host-to-Device       Pinned->Device       1024 B: 61
+     31678      7     Host-to-Device       Pinned->Device       2048 B: 61
+     31678      7   Device-to-Device       Device->Device       9216 B: 60
+     31678     13     Device-to-Host       Device->Pinned         24 B: 60
+     31678      7     Host-to-Device       Pinned->Device          4 B: 13
+     31678      7     Host-to-Device       Pinned->Device         56 B: 1
+
+[measured:repeat-b32] wall 2855.5 ms, GPU busy 2754.5 ms (96%), 68410 GPU ops, 72 model steps
+
+  phase=all: 2 stream(s) with work, 866 kernels/step, GPU kernel time 38.30 ms/step
+  wall 39.66 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.02 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0    62387     19389    1027    4854   2757.01 100.0% (null)
+        13     0        0         0     142       0      0.30   0.0%
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     31678      7   Device-to-Device       Device->Device       1792 B: 168
+     31678      7   Device-to-Device       Device->Device        128 B: 109
+     31678      7   Device-to-Device       Device->Device        256 B: 108
+     31678      7     Host-to-Device       Pinned->Device       1028 B: 71
+     31678      7     Host-to-Device       Pinned->Device       1024 B: 71
+     31678      7     Host-to-Device       Pinned->Device       2048 B: 71
+     31678      7   Device-to-Device       Device->Device       9216 B: 66
+     31678      7     Host-to-Device       Pinned->Device        256 B: 54
+     31678      7     Host-to-Device       Pinned->Device        132 B: 54
+     31678     13     Device-to-Host       Device->Pinned        768 B: 54
+     31678     13     Device-to-Host       Device->Pinned        128 B: 54
+     31678      7   Device-to-Device       Device->Device        132 B: 54
+
+[measured:story-b1] wall 3265.8 ms, GPU busy 3132.8 ms (96%), 104433 GPU ops, 118 model steps
+
+  phase=all: 2 stream(s) with work, 844 kernels/step, GPU kernel time 26.57 ms/step
+  wall 27.68 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.00 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0    99567     32821    4346     286   3134.27 100.0% (null)
+        13     0        0         0     234       0      0.67   0.0%
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     31678      7   Device-to-Device       Device->Device       1792 B: 2808
+     31678      7   Device-to-Device       Device->Device          8 B: 585
+     31678      7   Device-to-Device       Device->Device          4 B: 234
+     31678      7     Host-to-Device       Pinned->Device          8 B: 233
+     31678      7     Host-to-Device       Pinned->Device       1028 B: 117
+     31678     13     Device-to-Host       Device->Pinned          4 B: 117
+     31678      7     Host-to-Device       Pinned->Device       1024 B: 117
+     31678      7     Host-to-Device       Pinned->Device       2048 B: 117
+     31678      7   Device-to-Device       Device->Device       9216 B: 116
+     31678     13     Device-to-Host       Device->Pinned         24 B: 116
+     31678      7     Host-to-Device       Pinned->Device          4 B: 18
+     31678      7     Host-to-Device       Pinned->Device         12 B: 1
+
+[measured:story-b32] wall 4380.6 ms, GPU busy 4206.2 ms (96%), 121648 GPU ops, 127 model steps
+
+  phase=all: 2 stream(s) with work, 867 kernels/step, GPU kernel time 33.16 ms/step
+  wall 34.49 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.02 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0   110074     34788    1514    9810   4210.49 100.0% (null)
+        13     0        0         0     250       0      0.55   0.0%
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     31678      7   Device-to-Device       Device->Device        128 B: 207
+     31678      7   Device-to-Device       Device->Device        256 B: 204
+     31678      7     Host-to-Device       Pinned->Device       1028 B: 125
+     31678      7     Host-to-Device       Pinned->Device       1024 B: 125
+     31678      7     Host-to-Device       Pinned->Device       2048 B: 125
+     31678      7   Device-to-Device       Device->Device       9216 B: 108
+     31678      7     Host-to-Device       Pinned->Device        256 B: 102
+     31678      7     Host-to-Device       Pinned->Device        132 B: 102
+     31678     13     Device-to-Host       Device->Pinned        768 B: 102
+     31678     13     Device-to-Host       Device->Pinned        128 B: 102
+     31678      7   Device-to-Device       Device->Device        132 B: 102
+     31678      7     Host-to-Device       Pinned->Device         12 B: 31
+
+[measured:json-b1] wall 3292.0 ms, GPU busy 3117.0 ms (95%), 104928 GPU ops, 118 model steps
+
+  phase=all: 4 stream(s) with work, 845 kernels/step, GPU kernel time 26.45 ms/step
+  wall 27.90 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.01 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0    99707     32821    4352     286   3117.93  99.9% (null)
+        21     0        0         0     232       0      2.11   0.1%
+        13     0        0         0     234       0      0.42   0.0%
+        17     0        0         0     117       0      0.35   0.0%
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     31678      7   Device-to-Device       Device->Device       1792 B: 2808
+     31678      7   Device-to-Device       Device->Device          8 B: 585
+     31678      7   Device-to-Device       Device->Device          4 B: 234
+     31678      7     Host-to-Device       Pinned->Device          8 B: 233
+     31678      7     Host-to-Device       Pinned->Device       1028 B: 117
+     31678     13     Device-to-Host       Device->Pinned          4 B: 117
+     31678      7     Host-to-Device       Pinned->Device       1024 B: 117
+     31678      7     Host-to-Device       Pinned->Device       2048 B: 117
+     31678     17     Device-to-Host       Device->Pinned         16 B: 117
+     31678      7   Device-to-Device       Device->Device       9216 B: 116
+     31678     13     Device-to-Host       Device->Pinned         24 B: 116
+     31678     21     Host-to-Device       Pinned->Device      56976 B: 115
+
+################ config=draft-k4 ################
+CONFIG draft-k4: speculative_config=SpeculativeConfig(method='draft_model', model='Qwen/Qwen2.5-0.5B-Instruct', num_spec_tokens=4) async_scheduling=True
+RESULT config=draft-k4 workload=repeat-b1 requests=1 prompt_tokens=215 output_tokens=176: 1590.6 ms, 111 output tok/s, 9.04 ms per output token, drafted 144 accepted 142 (99%), 4.94 tokens per verify step
+RESULT config=draft-k4 workload=repeat-b32 requests=32 prompt_tokens=6609 output_tokens=5371: 3141.3 ms, 1710 output tok/s, drafted 4528 accepted 4265 (94%), 4.77 tokens per verify step
+RESULT config=draft-k4 workload=story-b1 requests=1 prompt_tokens=43 output_tokens=256: 3715.7 ms, 69 output tok/s, 14.51 ms per output token, drafted 348 accepted 168 (48%), 2.93 tokens per verify step
+RESULT config=draft-k4 workload=story-b32 requests=32 prompt_tokens=1322 output_tokens=8117: 5464.1 ms, 1486 output tok/s, drafted 11124 accepted 5355 (48%), 2.93 tokens per verify step
+RESULT config=draft-k4 workload=json-b1 requests=1 prompt_tokens=47 output_tokens=268: 3671.9 ms, 73 output tok/s, 13.70 ms per output token, drafted 330 accepted 182 (55%), 3.12 tokens per verify step
+[process 32103 VLLM::EngineCor] null stream id = 7
+  [created] 3494 streams, by priority: {-5: 1, -3: 32, -2: 32, -1: 32, 0: 3397}; stream-create / graph-instantiate calls: {'cudaStreamCreateWithPriority_v5050': 128, 'cudaGraphInstantiateWithFlags_v11040': 3359}
+  [active]  6 streams received work during the whole run: [7, 13, 17, 21, 25, 29]
+
+[measured:repeat-b1] wall 1590.6 ms, GPU busy 1493.2 ms (94%), 56833 GPU ops, 39 model steps
+
+  phase=all: 2 stream(s) with work, 1364 kernels/step, GPU kernel time 38.30 ms/step
+  wall 40.78 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.00 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0    53186     10650    3395     176   1493.74 100.0% (null)
+        13     0        0         0      76       0      0.09   0.0%
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     32103      7   Device-to-Device       Device->Device       1792 B: 2736
+     32103      7   Device-to-Device       Device->Device          8 B: 266
+     32103      7   Device-to-Device       Device->Device          4 B: 152
+     32103      7     Host-to-Device       Pinned->Device          8 B: 75
+     32103      7     Host-to-Device       Pinned->Device       1028 B: 38
+     32103     13     Device-to-Host       Device->Pinned          4 B: 38
+     32103      7     Host-to-Device       Pinned->Device       1024 B: 38
+     32103      7     Host-to-Device       Pinned->Device       2048 B: 38
+     32103      7   Device-to-Device       Device->Device      15360 B: 37
+     32103     13     Device-to-Host       Device->Pinned         40 B: 37
+     32103      7     Host-to-Device       Pinned->Device          4 B: 14
+     32103      7     Host-to-Device       Pinned->Device         56 B: 1
+
+[measured:repeat-b32] wall 3141.3 ms, GPU busy 3008.9 ms (96%), 88903 GPU ops, 56 model steps
+
+  phase=all: 2 stream(s) with work, 1488 kernels/step, GPU kernel time 53.80 ms/step
+  wall 56.10 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.01 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0    83313     15146    1520    3960   3012.69 100.0% (null)
+        13     0        0         0     110       0      0.27   0.0%
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     32103      7   Device-to-Device       Device->Device       1792 B: 720
+     32103      7   Device-to-Device       Device->Device        128 B: 136
+     32103      7   Device-to-Device       Device->Device          8 B: 90
+     32103      7   Device-to-Device       Device->Device        256 B: 68
+     32103      7     Host-to-Device       Pinned->Device       1028 B: 55
+     32103      7     Host-to-Device       Pinned->Device       1024 B: 55
+     32103      7     Host-to-Device       Pinned->Device       2048 B: 55
+     32103      7   Device-to-Device       Device->Device      15360 B: 48
+     32103      7   Device-to-Device       Device->Device          4 B: 40
+     32103      7     Host-to-Device       Pinned->Device        256 B: 34
+     32103      7     Host-to-Device       Pinned->Device        132 B: 34
+     32103     13     Device-to-Host       Device->Pinned       1280 B: 34
+
+[measured:story-b1] wall 3715.7 ms, GPU busy 3486.4 ms (94%), 133037 GPU ops, 90 model steps
+
+  phase=all: 2 stream(s) with work, 1383 kernels/step, GPU kernel time 38.75 ms/step
+  wall 41.29 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.01 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0   124512     24953    7939     408   3487.52 100.0% (null)
+        13     0        0         0     178       0      0.21   0.0%
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     32103      7   Device-to-Device       Device->Device       1792 B: 6408
+     32103      7   Device-to-Device       Device->Device          8 B: 623
+     32103      7   Device-to-Device       Device->Device          4 B: 356
+     32103      7     Host-to-Device       Pinned->Device          8 B: 177
+     32103      7     Host-to-Device       Pinned->Device       1028 B: 89
+     32103     13     Device-to-Host       Device->Pinned          4 B: 89
+     32103      7     Host-to-Device       Pinned->Device       1024 B: 89
+     32103      7     Host-to-Device       Pinned->Device       2048 B: 89
+     32103      7   Device-to-Device       Device->Device      15360 B: 88
+     32103     13     Device-to-Host       Device->Pinned         40 B: 88
+     32103      7     Host-to-Device       Pinned->Device          4 B: 19
+     32103      7     Host-to-Device       Pinned->Device         12 B: 1
+
+[measured:story-b32] wall 5464.1 ms, GPU busy 5213.5 ms (95%), 172344 GPU ops, 106 model steps
+
+  phase=all: 2 stream(s) with work, 1519 kernels/step, GPU kernel time 49.28 ms/step
+  wall 51.55 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.01 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0   160977     29168    1617    9540   5222.67 100.0% (null)
+        13     0        0         0     210       0      0.57   0.0%
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     32103      7   Device-to-Device       Device->Device        128 B: 286
+     32103      7   Device-to-Device       Device->Device       1792 B: 144
+     32103      7   Device-to-Device       Device->Device        256 B: 142
+     32103      7     Host-to-Device       Pinned->Device       1028 B: 105
+     32103      7     Host-to-Device       Pinned->Device       1024 B: 105
+     32103      7     Host-to-Device       Pinned->Device       2048 B: 105
+     32103      7   Device-to-Device       Device->Device      15360 B: 80
+     32103      7     Host-to-Device       Pinned->Device        256 B: 71
+     32103      7     Host-to-Device       Pinned->Device        132 B: 71
+     32103     13     Device-to-Host       Device->Pinned       1280 B: 71
+     32103     13     Device-to-Host       Device->Pinned        128 B: 71
+     32103      7   Device-to-Device       Device->Device        132 B: 71
+
+[measured:json-b1] wall 3671.9 ms, GPU busy 3430.5 ms (93%), 131942 GPU ops, 90 model steps
+
+  phase=all: 4 stream(s) with work, 1369 kernels/step, GPU kernel time 38.15 ms/step
+  wall 40.80 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.01 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0   123240     24672    7860     404   3431.18  99.9% (null)
+        21     0        0         0     174       0      1.75   0.1%
+        13     0        0         0     176       0      0.30   0.0%
+        17     0        0         0      88       0      0.25   0.0%
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     32103      7   Device-to-Device       Device->Device       1792 B: 6336
+     32103      7   Device-to-Device       Device->Device          8 B: 616
+     32103      7   Device-to-Device       Device->Device          4 B: 352
+     32103      7     Host-to-Device       Pinned->Device          8 B: 175
+     32103      7     Host-to-Device       Pinned->Device       1028 B: 88
+     32103     13     Device-to-Host       Device->Pinned          4 B: 88
+     32103      7     Host-to-Device       Pinned->Device       1024 B: 88
+     32103      7     Host-to-Device       Pinned->Device       2048 B: 88
+     32103     17     Device-to-Host       Device->Pinned         32 B: 88
+     32103      7   Device-to-Device       Device->Device      15360 B: 87
+     32103     13     Device-to-Host       Device->Pinned         40 B: 87
+     32103     21     Host-to-Device       Pinned->Device      94960 B: 86
+
+################ config=draft-k8 ################
+CONFIG draft-k8: speculative_config=SpeculativeConfig(method='draft_model', model='Qwen/Qwen2.5-0.5B-Instruct', num_spec_tokens=8) async_scheduling=True
+RESULT config=draft-k8 workload=repeat-b1 requests=1 prompt_tokens=215 output_tokens=176: 1521.7 ms, 116 output tok/s, 8.65 ms per output token, drafted 160 accepted 155 (97%), 8.75 tokens per verify step
+RESULT config=draft-k8 workload=repeat-b32 requests=32 prompt_tokens=6609 output_tokens=5369: 3862.8 ms, 1390 output tok/s, drafted 5400 accepted 4775 (88%), 8.07 tokens per verify step
+RESULT config=draft-k8 workload=story-b1 requests=1 prompt_tokens=43 output_tokens=256: 5025.3 ms, 51 output tok/s, 19.63 ms per output token, drafted 568 accepted 184 (32%), 3.59 tokens per verify step
+RESULT config=draft-k8 workload=story-b32 requests=32 prompt_tokens=1322 output_tokens=8087: 7862.1 ms, 1029 output tok/s, drafted 19040 accepted 5759 (30%), 3.42 tokens per verify step
+RESULT config=draft-k8 workload=json-b1 requests=1 prompt_tokens=47 output_tokens=268: 5033.1 ms, 53 output tok/s, 18.78 ms per output token, drafted 535 accepted 197 (37%), 3.77 tokens per verify step
+[process 32551 VLLM::EngineCor] null stream id = 7
+  [created] 3429 streams, by priority: {-5: 1, -3: 32, -2: 32, -1: 32, 0: 3332}; stream-create / graph-instantiate calls: {'cudaStreamCreateWithPriority_v5050': 128, 'cudaGraphInstantiateWithFlags_v11040': 3294}
+  [active]  6 streams received work during the whole run: [7, 13, 17, 21, 25, 29]
+
+[measured:repeat-b1] wall 1521.7 ms, GPU busy 1413.8 ms (93%), 59417 GPU ops, 23 model steps
+
+  phase=all: 2 stream(s) with work, 2388 kernels/step, GPU kernel time 61.49 ms/step
+  wall 66.16 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.01 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0    54914      6154    4259     200   1414.21 100.0% (null)
+        13     0        0         0      44       0      0.06   0.0%
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     32551      7   Device-to-Device       Device->Device       1792 B: 3696
+     32551      7   Device-to-Device       Device->Device          8 B: 242
+     32551      7   Device-to-Device       Device->Device          4 B: 176
+     32551      7     Host-to-Device       Pinned->Device          8 B: 43
+     32551      7     Host-to-Device       Pinned->Device       1028 B: 22
+     32551     13     Device-to-Host       Device->Pinned          4 B: 22
+     32551      7     Host-to-Device       Pinned->Device       1024 B: 22
+     32551      7     Host-to-Device       Pinned->Device       2048 B: 22
+     32551      7   Device-to-Device       Device->Device      27648 B: 21
+     32551     13     Device-to-Host       Device->Pinned         72 B: 21
+     32551      7     Host-to-Device       Pinned->Device          4 B: 14
+     32551      7     Host-to-Device       Pinned->Device         56 B: 1
+
+[measured:repeat-b32] wall 3862.9 ms, GPU busy 3645.4 ms (94%), 131915 GPU ops, 46 model steps
+
+  phase=all: 2 stream(s) with work, 2691 kernels/step, GPU kernel time 79.35 ms/step
+  wall 83.98 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.01 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0   123786     12336    3263    4776   3650.01 100.0% (null)
+        13     0        0         0      90       0      0.18   0.0%
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     32551      7   Device-to-Device       Device->Device       1792 B: 2352
+     32551      7   Device-to-Device       Device->Device          8 B: 202
+     32551      7   Device-to-Device       Device->Device        128 B: 161
+     32551      7   Device-to-Device       Device->Device          4 B: 112
+     32551      7     Host-to-Device       Pinned->Device       1028 B: 45
+     32551      7     Host-to-Device       Pinned->Device       1024 B: 45
+     32551      7     Host-to-Device       Pinned->Device       2048 B: 45
+     32551      7   Device-to-Device       Device->Device        256 B: 40
+     32551      7     Host-to-Device       Pinned->Device          8 B: 28
+     32551      7   Device-to-Device       Device->Device         12 B: 22
+     32551      7     Host-to-Device       Pinned->Device        256 B: 20
+     32551      7     Host-to-Device       Pinned->Device        132 B: 20
+
+[measured:story-b1] wall 5025.3 ms, GPU busy 4665.3 ms (93%), 197025 GPU ops, 74 model steps
+
+  phase=all: 2 stream(s) with work, 2461 kernels/step, GPU kernel time 63.06 ms/step
+  wall 67.91 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.01 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0   182136     20457   14107     636   4666.28 100.0% (null)
+        13     0        0         0     146       0      0.17   0.0%
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     32551      7   Device-to-Device       Device->Device       1792 B: 12264
+     32551      7   Device-to-Device       Device->Device          8 B: 803
+     32551      7   Device-to-Device       Device->Device          4 B: 584
+     32551      7     Host-to-Device       Pinned->Device          8 B: 145
+     32551      7     Host-to-Device       Pinned->Device       1028 B: 73
+     32551     13     Device-to-Host       Device->Pinned          4 B: 73
+     32551      7     Host-to-Device       Pinned->Device       1024 B: 73
+     32551      7     Host-to-Device       Pinned->Device       2048 B: 73
+     32551      7   Device-to-Device       Device->Device      27648 B: 72
+     32551     13     Device-to-Host       Device->Pinned         72 B: 72
+     32551      7     Host-to-Device       Pinned->Device          4 B: 19
+     32551      7     Host-to-Device       Pinned->Device         16 B: 1
+
+[measured:story-b32] wall 7862.1 ms, GPU busy 7416.6 ms (94%), 285889 GPU ops, 97 model steps
+
+  phase=all: 2 stream(s) with work, 2775 kernels/step, GPU kernel time 76.61 ms/step
+  wall 81.05 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.02 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0   269164     26414    2407   14128   7430.34 100.0% (null)
+        13     0        0         0     190       0      0.40   0.0%
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     32551      7   Device-to-Device       Device->Device       1792 B: 672
+     32551      7   Device-to-Device       Device->Device        128 B: 482
+     32551      7   Device-to-Device       Device->Device        256 B: 120
+     32551      7     Host-to-Device       Pinned->Device       1028 B: 95
+     32551      7     Host-to-Device       Pinned->Device       1024 B: 95
+     32551      7     Host-to-Device       Pinned->Device       2048 B: 95
+     32551      7   Device-to-Device       Device->Device     635904 B: 61
+     32551      7   Device-to-Device       Device->Device          8 B: 60
+     32551      7     Host-to-Device       Pinned->Device        256 B: 60
+     32551      7     Host-to-Device       Pinned->Device        132 B: 60
+     32551     13     Device-to-Host       Device->Pinned       2304 B: 60
+     32551     13     Device-to-Host       Device->Pinned        128 B: 60
+
+[measured:json-b1] wall 5033.1 ms, GPU busy 4656.4 ms (93%), 197376 GPU ops, 75 model steps
+
+  phase=all: 4 stream(s) with work, 2430 kernels/step, GPU kernel time 62.12 ms/step
+  wall 67.11 ms/step; host time inside NVTX 'schedule: update_after_schedule' 0.01 ms/step
+    stream  prio  kernels  in-graph  memcpy  memset    GPU ms  share
+         7     0   182257     20457   14120     636   4657.14 100.0% (null)
+        21     0        0         0     144       0      1.60   0.0%
+        13     0        0         0     146       0      0.25   0.0%
+        17     0        0         0      73       0      0.14   0.0%
+
+  memcpys (pid, stream, direction, memory kinds, bytes): count
+     32551      7   Device-to-Device       Device->Device       1792 B: 12264
+     32551      7   Device-to-Device       Device->Device          8 B: 803
+     32551      7   Device-to-Device       Device->Device          4 B: 584
+     32551      7     Host-to-Device       Pinned->Device          8 B: 145
+     32551      7     Host-to-Device       Pinned->Device       1028 B: 73
+     32551     13     Device-to-Host       Device->Pinned          4 B: 73
+     32551      7     Host-to-Device       Pinned->Device       1024 B: 73
+     32551      7     Host-to-Device       Pinned->Device       2048 B: 73
+     32551     17     Device-to-Host       Device->Pinned         64 B: 73
+     32551      7   Device-to-Device       Device->Device      27648 B: 72
+     32551     13     Device-to-Host       Device->Pinned         72 B: 72
+     32551     21     Host-to-Device       Pinned->Device     170928 B: 71
+
+################ output comparison ################
+== controls (no speculation)
+  repeat: reference b1 vs the same prompt in reference b32: 1/1 identical
+  story: reference b1 vs the same prompt in reference b32: 0/1 identical; top-2 gap at first mismatch: {0.25: 1}
+    request 0: pos 75: reference token 4710, other 576; reference top-2 logprob gap 0.2500 (other picked the runner-up)
+
+== baseline measured pass (no logprobs) vs reference
+  repeat-b1: 1/1 identical
+  repeat-b32: 32/32 identical
+  story-b1: 1/1 identical
+  story-b32: 28/32 identical; top-2 gap at first mismatch: {0.0: 2, 0.125: 2}
+    request 0: pos 53: reference token 700, other 11435; reference top-2 logprob gap 0.0000 (other picked the runner-up)
+    request 1: pos 149: reference token 12305, other 5662; reference top-2 logprob gap 0.1250 (other picked the runner-up)
+    request 2: pos 5: reference token 304, other 1378; reference top-2 logprob gap 0.0000
+    request 3: pos 104: reference token 2581, other 1033; reference top-2 logprob gap 0.1250 (other picked the runner-up)
+  json-b1: 1/1 identical
+    JSON: 1/1 finished outputs parse; 0 hit max_tokens
+
+== draft-k2 vs reference
+  repeat-b1: 1/1 identical
+  repeat-b32: 31/32 identical; top-2 gap at first mismatch: {0.125: 1}
+    request 19: pos 124: reference token 87856, other 12341; reference top-2 logprob gap 0.1250 (other picked the runner-up)
+  story-b1: 0/1 identical; top-2 gap at first mismatch: {0.125: 1}
+    request 0: pos 76: reference token 32631, other 1655; reference top-2 logprob gap 0.1250 (other picked the runner-up)
+  story-b32: 1/32 identical; top-2 gap at first mismatch: {0.0: 14, 0.125: 14, 0.25: 3}
+    request 0: pos 75: reference token 576, other 4710; reference top-2 logprob gap 0.0000 (other picked the runner-up)
+    request 1: pos 10: reference token 5166, other 4892; reference top-2 logprob gap 0.2500 (other picked the runner-up)
+    request 2: pos 76: reference token 315, other 1053; reference top-2 logprob gap 0.0000 (other picked the runner-up)
+    request 3: pos 104: reference token 2581, other 1033; reference top-2 logprob gap 0.1250 (other picked the runner-up)
+    ... 27 more
+  json-b1: 0/1 identical; top-2 gap at first mismatch: {0.0: 1}
+    request 0: pos 109: reference token 23704, other 53334; reference top-2 logprob gap 0.0000 (other picked the runner-up)
+    JSON: 1/1 finished outputs parse; 0 hit max_tokens
+
+== draft-k4 vs reference
+  repeat-b1: 1/1 identical
+  repeat-b32: 29/32 identical; top-2 gap at first mismatch: {0.0: 1, 0.125: 2}
+    request 8: pos 53: reference token 279, other 11; reference top-2 logprob gap 0.1250 (other picked the runner-up)
+    request 19: pos 124: reference token 87856, other 12341; reference top-2 logprob gap 0.1250 (other picked the runner-up)
+    request 22: pos 108: reference token 897, other 19083; reference top-2 logprob gap 0.0000 (other picked the runner-up)
+  story-b1: 0/1 identical; top-2 gap at first mismatch: {0.125: 1}
+    request 0: pos 76: reference token 32631, other 1655; reference top-2 logprob gap 0.1250 (other picked the runner-up)
+  story-b32: 1/32 identical; top-2 gap at first mismatch: {0.0: 14, 0.125: 17}
+    request 1: pos 142: reference token 13, other 429; reference top-2 logprob gap 0.0000 (other picked the runner-up)
+    request 2: pos 76: reference token 315, other 1053; reference top-2 logprob gap 0.0000 (other picked the runner-up)
+    request 3: pos 104: reference token 2581, other 1033; reference top-2 logprob gap 0.1250 (other picked the runner-up)
+    request 4: pos 113: reference token 15043, other 1730; reference top-2 logprob gap 0.1250 (other picked the runner-up)
+    ... 27 more
+  json-b1: 0/1 identical; top-2 gap at first mismatch: {0.0: 1}
+    request 0: pos 109: reference token 23704, other 53334; reference top-2 logprob gap 0.0000 (other picked the runner-up)
+    JSON: 1/1 finished outputs parse; 0 hit max_tokens
+
+== draft-k8 vs reference
+  repeat-b1: 1/1 identical
+  repeat-b32: 29/32 identical; top-2 gap at first mismatch: {0.0: 1, 0.125: 2}
+    request 8: pos 53: reference token 279, other 11; reference top-2 logprob gap 0.1250 (other picked the runner-up)
+    request 19: pos 131: reference token 1526, other 315; reference top-2 logprob gap 0.1250 (other picked the runner-up)
+    request 22: pos 108: reference token 897, other 19083; reference top-2 logprob gap 0.0000 (other picked the runner-up)
+  story-b1: 0/1 identical; top-2 gap at first mismatch: {0.125: 1}
+    request 0: pos 76: reference token 32631, other 1655; reference top-2 logprob gap 0.1250 (other picked the runner-up)
+  story-b32: 0/32 identical; top-2 gap at first mismatch: {0.0: 14, 0.125: 17, 0.25: 1}
+    request 0: pos 75: reference token 576, other 4710; reference top-2 logprob gap 0.0000 (other picked the runner-up)
+    request 1: pos 10: reference token 5166, other 4892; reference top-2 logprob gap 0.2500 (other picked the runner-up)
+    request 2: pos 76: reference token 315, other 1053; reference top-2 logprob gap 0.0000 (other picked the runner-up)
+    request 3: pos 104: reference token 2581, other 1033; reference top-2 logprob gap 0.1250 (other picked the runner-up)
+    ... 28 more
+  json-b1: 0/1 identical; top-2 gap at first mismatch: {0.0: 1}
+    request 0: pos 109: reference token 23704, other 53334; reference top-2 logprob gap 0.0000 (other picked the runner-up)
+    JSON: 1/1 finished outputs parse; 0 hit max_tokens
+
+== ngram-k4 vs reference
+  repeat-b1: 1/1 identical
+  repeat-b32: 29/32 identical; top-2 gap at first mismatch: {0.0: 1, 0.125: 2}
+    request 8: pos 53: reference token 279, other 11; reference top-2 logprob gap 0.1250 (other picked the runner-up)
+    request 19: pos 131: reference token 1526, other 315; reference top-2 logprob gap 0.1250 (other picked the runner-up)
+    request 22: pos 108: reference token 897, other 19083; reference top-2 logprob gap 0.0000 (other picked the runner-up)
+  story-b1: 0/1 identical; top-2 gap at first mismatch: {0.125: 1}
+    request 0: pos 76: reference token 32631, other 1655; reference top-2 logprob gap 0.1250 (other picked the runner-up)
+  story-b32: 0/32 identical; top-2 gap at first mismatch: {0.0: 14, 0.125: 17, 0.25: 1}
+    request 0: pos 75: reference token 576, other 4710; reference top-2 logprob gap 0.0000 (other picked the runner-up)
+    request 1: pos 10: reference token 5166, other 4892; reference top-2 logprob gap 0.2500 (other picked the runner-up)
+    request 2: pos 76: reference token 315, other 1053; reference top-2 logprob gap 0.0000 (other picked the runner-up)
+    request 3: pos 104: reference token 2581, other 1033; reference top-2 logprob gap 0.1250 (other picked the runner-up)
+    ... 28 more
+  json-b1: 0/1 identical; top-2 gap at first mismatch: {0.0: 1}
+    request 0: pos 109: reference token 23704, other 53334; reference top-2 logprob gap 0.0000 (other picked the runner-up)
+    JSON: 1/1 finished outputs parse; 0 hit max_tokens
